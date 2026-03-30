@@ -1,0 +1,2776 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-touch-fullscreen" content="yes">
+    <title>Fall of Flags / Падение Флагов</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        /* Smooth grid transitions */
+        #country-selection { transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        .log-entry { animation: fadeIn 0.5s ease-out; }
+
+        /* Safe area for iPhone notch / full screen */
+        :root { --safe-top: env(safe-area-inset-top, 0px); --safe-right: env(safe-area-inset-right, 0px); --safe-bottom: env(safe-area-inset-bottom, 0px); --safe-left: env(safe-area-inset-left, 0px); --vh: 1vh; }
+        body { padding-top: calc(1rem + var(--safe-top)); padding-right: calc(1rem + var(--safe-right)); padding-bottom: calc(1rem + var(--safe-bottom)); padding-left: calc(1rem + var(--safe-left)); min-height: calc(var(--vh, 1vh) * 100); }
+        button, input, select, textarea { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        @media (orientation: portrait) { body { min-height: calc(var(--vh, 1vh) * 100); }}
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes spin-fly { 0% { transform: rotate(0deg) scale(1); opacity: 1; } 30% { transform: rotate(-30deg) scale(0.9); } 100% { transform: rotate(1080deg) translateY(-100vh) scale(0.5); opacity: 0; } }
+        @keyframes enter-spin { 0% { transform: scale(5) rotate(-360deg); opacity: 0; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
+        @keyframes pulse-emoji { 0%, 100% { transform: scale(1); filter: brightness(1); } 50% { transform: scale(1.25); filter: brightness(1.2); } }
+        .anim-enter { animation: enter-spin 1.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, pulse-emoji 3s ease-in-out infinite 1.8s; }
+        .anim-spin-fly { animation: spin-fly 1.8s ease-in-out forwards; }
+        /* Card Animations */
+        @keyframes shake { 0% { transform: translate(0, 0) rotate(0deg); } 15% { transform: translate(-2px, -1px) rotate(-1deg); } 30% { transform: translate(2px, 1px) rotate(1deg); } 45% { transform: translate(-2px, 1px) rotate(-1deg); } 60% { transform: translate(2px, -1px) rotate(1deg); } 75% { transform: translate(-1px, 1px) rotate(0deg); } 100% { transform: translate(0, 0) rotate(0deg); } }
+        @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); } 70% { box-shadow: 0 0 0 12px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+        @keyframes flash-red { 0%, 100% { background-color: #1f2937; } 50% { background-color: #7f1d1d; } }
+        .anim-shake { animation: shake 0.6s ease-in-out; }
+        .anim-heal { animation: pulse-green 0.8s ease-out; }
+        .anim-damage { animation: flash-red 0.4s ease-in-out; }
+        /* Projectile Animation */
+        .projectile { position: fixed; z-index: 100; font-size: 2rem; pointer-events: none; transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1); will-change: transform; }
+        /* Card Appearance Animation */
+        .anim-appear { animation: appear 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+        @keyframes appear { from { opacity: 0; transform: scale(0.9) translateY(15px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        /* Shimmer Effect */
+        @keyframes shimmer { 0% { transform: translateX(-150%) skewX(-15deg); } 100% { transform: translateX(150%) skewX(-15deg); } }
+        .group:hover .shimmer-effect { animation: shimmer 1s infinite; }
+        /* Country card styles */
+        .card-alive { border-left: 4px solid #10b981; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .card-dead { border-left: 4px solid #ef4444; opacity: 0.6; filter: grayscale(100%); transition: all 0.5s ease; }
+        .card-player { border: 2px solid #3b82f6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.4); }
+        .card-ally { border-right: 4px solid #f59e0b; }
+        /* Snow Animation */
+        @keyframes fall { 0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(360deg); opacity: 0; } }
+        .snowflake { position: fixed; top: -2rem; z-index: 50; pointer-events: none; user-select: none; animation-name: fall; animation-timing-function: linear; animation-fill-mode: forwards; }
+        @keyframes fall-text { 0% { transform: translateY(-10vh) rotate(-10deg); opacity: 1; } 50% { transform: translateY(50vh) rotate(10deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(-10deg); opacity: 0; } }
+        .snowflake.text-flake { animation-name: fall-text; white-space: nowrap; text-shadow: 0 2px 4px rgba(0,0,0,0.8); font-weight: bold; }
+        /* Floating Damage Text */
+        @keyframes floatUp { 0% { transform: translate(-50%, -50%) scale(1); opacity: 0; } 10% { opacity: 1; transform: translate(-50%, -60%) scale(1.2); } 100% { transform: translate(-50%, -200%) scale(1); opacity: 0; } }
+        .floating-text { position: absolute; transform: translate(-50%, -50%); font-weight: 900; font-size: 2.2rem; pointer-events: none; z-index: 9999; text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; animation: floatUp 2.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+        /* Liquid Glass Effect */
+        .glass-mode { background: radial-gradient(circle at 50% 0%, #1f2937 0%, #111827 100%) !important; background-attachment: scroll !important; }
+        .glass-mode #intro-overlay { background: radial-gradient(circle at 50% 0%, #1f2937 0%, #111827 100%) !important; }
+        
+        /* Optimized Panels */
+        .glass-mode #setup-screen, .glass-mode #action-panel, .glass-mode #game-log, .glass-mode #settings-dropdown, .glass-mode .bg-gray-800, .glass-mode .bg-gray-900, .glass-mode .bg-gray-800\/80 {
+            background-color: rgba(20, 25, 40, 0.6) !important; 
+            backdrop-filter: blur(12px) saturate(140%); 
+            -webkit-backdrop-filter: blur(12px) saturate(140%); 
+            border: 1px solid rgba(255, 255, 255, 0.08) !important; 
+            border-top: 1px solid rgba(255, 255, 255, 0.2) !important; 
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important; 
+            border-radius: 20px;
+        }
+
+        /* Optimized Cards & Buttons */
+        .glass-mode #country-selection button, .glass-mode .card-alive, .glass-mode .card-dead, .glass-mode #action-buttons button, .glass-mode .projectile {
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 100%) !important; 
+            backdrop-filter: blur(6px); 
+            -webkit-backdrop-filter: blur(6px); 
+            border: 1px solid rgba(255, 255, 255, 0.1) !important; 
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important; 
+            border-radius: 12px; 
+            transition: transform 0.2s ease, background 0.2s ease;
+        }
+        
+        .glass-mode #country-selection button:hover, .glass-mode .card-alive:hover, .glass-mode #action-buttons button:hover {
+            transform: translateY(-4px) scale(1.02); 
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%) !important; 
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important; 
+            border-color: rgba(255, 255, 255, 0.3) !important; 
+            z-index: 10;
+        }
+        .glass-mode #start-btn { background: linear-gradient(135deg, rgba(59, 130, 246, 0.7), rgba(99, 102, 241, 0.7)) !important; backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.4); box-shadow: 0 10px 30px rgba(59, 130, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.4); }
+        .glass-mode #start-btn:hover { box-shadow: 0 15px 40px rgba(59, 130, 246, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.6); }
+        .glass-mode #country-selection button.selected-card, .glass-mode input:checked + div {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.35), rgba(37, 99, 235, 0.25)) !important; border: 2px solid rgba(96, 165, 250, 0.8); box-shadow: 0 0 25px rgba(59, 130, 246, 0.6), inset 0 0 15px rgba(59, 130, 246, 0.2); z-index: 30;
+        }
+        .target-active { filter: brightness(1.2) contrast(1.1); z-index: 40; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .glass-mode .target-active { background: linear-gradient(145deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.1) 100%) !important; box-shadow: 0 0 30px rgba(255, 255, 255, 0.3), inset 0 0 20px rgba(255, 255, 255, 0.2); border: 2px solid rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px) brightness(1.2); }
+        .glass-mode h1, .glass-mode h2, .glass-mode h3, .glass-mode span, .glass-mode p, .glass-mode div { text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+        .glass-mode input, .glass-mode select { background-color: rgba(0, 0, 0, 0.4) !important; border-color: rgba(255, 255, 255, 0.2) !important; backdrop-filter: blur(10px); border-radius: 12px; }
+        
+        /* Mobile Optimizations */
+        @media (max-width: 768px) {
+            .fixed.top-4.right-4 { top: 1rem; right: 1rem; }
+            .fixed.top-4.right-4 button { padding: 0.5rem; font-size: 1.25rem; }
+            #country-selection { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 2px; }
+            #action-panel, #game-log { max-height: 40vh; overflow-y: auto; }
+            #action-buttons button { padding: 0.5rem; font-size: 0.75rem; }
+            .floating-text { font-size: 1.5rem; }
+            .projectile { font-size: 1.5rem; }
+            #settings-dropdown { min-width: 100px; }
+            #settings-dropdown button { padding: 0.5rem 0.75rem; font-size: 0.75rem; }
+        }
+        @media (max-width: 480px) {
+            #country-selection { grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); }
+            .fixed.top-4.right-4 button { padding: 0.375rem; font-size: 1rem; }
+            #action-panel, #game-log { max-height: 30vh; }
+            #action-buttons button { padding: 0.375rem; font-size: 0.7rem; }
+            .text-3xl { font-size: 1.5rem; }
+            .text-2xl { font-size: 1.25rem; }
+            .text-xl { font-size: 1rem; }
+        }
+        
+
+
+        .active-turn-highlight { animation: pulse-border 2s infinite; z-index: 20; }
+        @keyframes pulse-border { 0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); border-color: rgba(59, 130, 246, 0.5); } 50% { border-color: rgba(59, 130, 246, 1); box-shadow: 0 0 15px rgba(59, 130, 246, 0.3); } 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); border-color: rgba(59, 130, 246, 0.5); } }
+
+        /* Unified Pulse for Selection & Effects */
+        @keyframes pulse-effect { 0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); } 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } }
+        @keyframes pulse-damage { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.9); } 30% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+        @keyframes pulse-heal { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.9); } 30% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+
+        .selected-card { animation: pulse-effect 2s infinite !important; border-color: rgba(59, 130, 246, 1) !important; z-index: 10; transform: scale(1.02); }
+        .pulse-damage-effect { animation: pulse-damage 2.5s infinite !important; z-index: 20; border-color: #ef4444 !important; }
+        .pulse-heal-effect { animation: pulse-heal 2.5s infinite !important; z-index: 20; border-color: #10b981 !important; }
+
+        /* HP Glint - Conditional */
+        .hp-glint-container { position: relative; overflow: hidden; }
+        .hp-glint-active::after { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent); transform: skewX(-20deg) translateX(-150%); animation: glint-sweep 2.5s ease-in-out infinite; }
+        @keyframes glint-sweep { 0% { transform: skewX(-20deg) translateX(-150%); } 30% { transform: skewX(-20deg) translateX(150%); } 100% { transform: skewX(-20deg) translateX(150%); } }
+        
+        /* Custom Scrollbar for Lore Modal */
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(31, 41, 55, 0.5); border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(75, 85, 99, 0.8); border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(107, 114, 128, 1); }
+
+        /* Toast/Notification Styles */
+        @keyframes slideInRight { from { transform: translateX(150%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideInTop { from { transform: translateX(-150%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideOutRight { from { transform: translateX(0); opacity: 1; } to { transform: translateX(150%); opacity: 0; } }
+        @keyframes slideOutTop { from { transform: translateX(0); opacity: 1; } to { transform: translateX(-150%); opacity: 0; } }
+
+        .toast-container { position: fixed; z-index: 200; pointer-events: auto; }
+        .toast-container.desktop { bottom: 1.5rem; right: 1.5rem; }
+        .toast-container.mobile { top: calc(env(safe-area-inset-top, 0px) + 1rem); right: 1rem; left: 1rem; }
+
+        .toast-notification { 
+            display: flex; align-items: flex-start; gap: 1rem; 
+            padding: 1rem 1.25rem; 
+            background: rgba(20, 25, 40, 0.95); 
+            border: 1px solid rgba(255, 255, 255, 0.15); 
+            border-radius: 12px; 
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); 
+            backdrop-filter: blur(12px); 
+            animation: slideInRight 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            max-width: 400px;
+        }
+        .toast-container.mobile .toast-notification { 
+            animation: slideInTop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            margin-bottom: 0.75rem;
+        }
+
+        .toast-notification.hide { animation: slideOutRight 0.3s ease-out forwards; }
+        .toast-container.mobile .toast-notification.hide { animation: slideOutTop 0.3s ease-out forwards; }
+
+        .toast-close { 
+            flex-shrink: 0; 
+            display: flex; align-items: center; justify-content: center;
+            width: 1.5rem; height: 1.5rem; 
+            background: rgba(255, 255, 255, 0.1); 
+            border: none; 
+            border-radius: 50%; 
+            color: #fff; 
+            cursor: pointer; 
+            font-size: 1.25rem; 
+            line-height: 1;
+            transition: all 0.2s ease;
+            padding: 0;
+        }
+        .toast-close:hover { background: rgba(255, 255, 255, 0.2); transform: scale(1.1); }
+        .toast-close:active { transform: scale(0.95); }
+
+        .toast-content { 
+            flex: 1; 
+            display: flex; flex-direction: column; gap: 0.25rem;
+            word-wrap: break-word;
+        }
+        .toast-content p { margin: 0; line-height: 1.4; }
+    </style>
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-4 transition-colors duration-300">
+
+    <!-- Intro Overlay -->
+    <div id="intro-overlay" class="fixed inset-0 z-[100] bg-gray-900 flex flex-col items-center justify-center overflow-hidden transition-transform duration-1000 ease-in-out">
+        <div id="intro-bg" class="absolute inset-0 grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 p-8 opacity-30 blur-[4px] pointer-events-none select-none grayscale-0 scale-105"></div>
+        <div class="relative z-10 text-center animate-in fade-in zoom-in duration-1000">
+            <div class="text-8xl md:text-9xl mb-6 animate-[pulse-emoji_2s_infinite] drop-shadow-[0_0_25px_rgba(59,130,246,0.6)]">🌏</div>
+            <h1 class="text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-500 to-indigo-500 drop-shadow-2xl mb-2 animate-gradient-text">Fall of Flags</h1>
+            <p class="text-xl md:text-3xl text-gray-400 font-bold tracking-[0.2em] uppercase drop-shadow-lg">Падение Флагов</p>
+        </div>
+    </div>
+
+    <!-- Top Right Controls -->
+    <div class="fixed top-4 right-4 z-50 flex flex-col items-end gap-2">
+        <div class="flex items-center gap-2">
+            <button id="btn-lore" onclick="toggleLore()" class="text-2xl hover:text-yellow-400 transition hover:scale-110 bg-gray-800/80 p-2 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm" title="Alliances">📜</button>
+            <button id="btn-map" onclick="toggleRegion()" class="text-2xl hover:text-green-400 transition hover:scale-110 bg-gray-800/80 p-2 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm" title="Switch Region">🏰</button>
+            <button onclick="toggleSettings()" class="text-2xl hover:text-blue-400 transition transform hover:rotate-90 bg-gray-800/80 p-2 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm">⚙️</button>
+        </div>
+        
+        <div id="settings-dropdown" class="hidden bg-gray-800 border border-gray-700 p-3 rounded-lg shadow-xl flex flex-col gap-3 min-w-[120px] backdrop-blur-md">
+            <button onclick="toggleSnow()" id="btn-snow" class="px-3 py-2 rounded border border-gray-600 hover:bg-gray-700 text-sm font-bold transition w-full flex items-center justify-center gap-2">
+                <span id="txt-snow">Snow</span> <span id="emoji-snow">❄️</span>
+            </button>
+            <button onclick="toggleAnimations()" id="btn-anim" class="px-3 py-2 rounded border border-gray-600 hover:bg-gray-700 text-sm font-bold transition w-full flex items-center justify-center gap-2 bg-blue-900 border-blue-500">
+                <span id="txt-anim">Anim: ON</span> 🎬
+            </button>
+            <button onclick="toggleLiquidGlass()" id="btn-glass" class="px-3 py-2 rounded border border-gray-600 hover:bg-gray-700 text-sm font-bold transition w-full flex items-center justify-center gap-2">
+                <span id="txt-glass">Liquid Glass</span> 💧
+            </button>
+            <button onclick="saveGameState()" class="px-3 py-2 rounded border border-gray-600 hover:bg-gray-700 text-sm font-bold transition w-full flex items-center justify-center gap-2">
+                <span>Save Game</span> 💾
+            </button>
+            <button onclick="loadGameState()" class="px-3 py-2 rounded border border-gray-600 hover:bg-gray-700 text-sm font-bold transition w-full flex items-center justify-center gap-2">
+                <span>Load Game</span> 📂
+            </button>
+            <button onclick="clearSavedGame()" class="px-3 py-2 rounded border border-red-600 hover:bg-red-700 text-sm font-bold transition w-full flex items-center justify-center gap-2 text-red-400">
+                <span>Clear Save</span> 🗑️
+            </button>
+            <div class="flex gap-2 w-full">
+                <button onclick="setDifficulty('easy')" id="diff-easy" class="flex-1 px-2 py-1 rounded border border-gray-600 hover:bg-gray-700 text-xs font-bold transition" title="Easy AI (Random moves)">EASY</button>
+                <button onclick="setDifficulty('normal')" id="diff-normal" class="flex-1 px-2 py-1 rounded border border-gray-600 hover:bg-gray-700 text-xs font-bold transition bg-blue-900 border-blue-500" title="Normal AI (Smart moves)">NORMAL</button>
+                <button onclick="setDifficulty('hard')" id="diff-hard" class="flex-1 px-2 py-1 rounded border border-red-900/50 hover:bg-gray-700 text-xs font-bold transition text-red-400" title="Hard AI (Strategy & Alliances)">HARD</button>
+            </div>
+            <div class="flex gap-2 w-full">
+                <button onclick="setLanguage('en')" id="lang-en" class="flex-1 px-2 py-1 rounded border border-gray-600 hover:bg-gray-700 text-xs font-bold transition">ENG</button>
+                <button onclick="setLanguage('ru')" id="lang-ru" class="flex-1 px-2 py-1 rounded border border-gray-600 hover:bg-gray-700 text-xs font-bold transition bg-blue-900 border-blue-500">RUS</button>
+            </div>
+            <button onclick="toggleDevModal()" id="btn-dev-menu" class="hidden w-full px-2 py-1 rounded border border-red-600 bg-red-900/20 hover:bg-red-900/50 text-red-400 text-xs font-bold transition animate-pulse">👨‍💻 DEV MENU</button>
+        </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <header class="mb-6 text-center relative pt-8">
+            <h1 class="text-3xl font-bold text-blue-400 mb-2" id="header-title">
+                <img id="header-emoji" class="inline-block cursor-pointer anim-enter" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABQAAAAUACAYAAAAY5P/3AAAgAElEQVR4Aey9+ZMmx33ml1X1vm8fc+IakARJSASme8BDoo71akntwkQIAAAQIECBAgQIAAAQIECBAg0LaAALDt8dN7AgQIECBAgAABAgQIECBAgAABAisF/g/VloujswGnrAAAAABJRU5ErkJggg==" alt="Burning Flag" style="width:1.4em;height:1.4em;background:transparent;border:0;filter:drop-shadow(0 0 0 rgba(0,0,0,0));" />
+                <span id="header-text">Падение Флагов</span>
+            </h1>
+            <p class="text-gray-400 text-sm" id="header-desc">Пошаговая стратегия.</p>
+            <p class="text-xs text-yellow-500 mt-1" id="header-rules">Победитель может быть только один. Альянсы создаются сердцами, но они хрупкие.</p>
+        </header>
+
+        <!-- Language Selection -->
+        <div id="language-selection" class="flex flex-col items-center justify-center py-12 transition-all duration-500">
+            <h2 class="text-3xl md:text-4xl font-bold text-white mb-10 drop-shadow-lg text-center">Select Language / Выберите язык</h2>
+            <div class="flex flex-col md:flex-row gap-8">
+                <button onclick="selectLanguageAndStart('ru')" class="group relative p-8 bg-gray-800/60 backdrop-blur-xl border border-gray-600 hover:border-blue-500 rounded-3xl transition-all hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/20 w-72 text-center overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div class="text-7xl mb-6 transition-transform group-hover:scale-110 drop-shadow-2xl">🇷🇺</div>
+                    <div class="text-3xl font-bold text-white mb-2 relative z-10">Русский</div>
+                    <div class="text-sm text-gray-400 font-medium tracking-wider relative z-10">RUSSIAN</div>
+                </button>
+                <button onclick="selectLanguageAndStart('en')" class="group relative p-8 bg-gray-800/60 backdrop-blur-xl border border-gray-600 hover:border-blue-500 rounded-3xl transition-all hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/20 w-72 text-center overflow-hidden">
+                     <div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div class="text-7xl mb-6 transition-transform group-hover:scale-110 drop-shadow-2xl flex justify-center gap-4">
+                        <span>🇬🇧</span><span>🇺🇸</span>
+                    </div>
+                    <div class="text-3xl font-bold text-white mb-2 relative z-10">English</div>
+                    <div class="text-sm text-gray-400 font-medium tracking-wider relative z-10">ENGLISH</div>
+                </button>
+            </div>
+            <div id="language-saved-hint" class="mt-4 text-xs text-green-300 hidden">Язык сохранён.</div>
+        </div>
+
+        <!-- Game Setup -->
+        <div id="setup-screen" class="hidden bg-gray-800/80 backdrop-blur-xl border border-gray-700 p-8 rounded-2xl shadow-2xl text-center max-w-4xl mx-auto transition-all duration-300 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-50"></div>
+            <div class="absolute -top-10 -right-10 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 relative z-10">
+                <h2 class="text-2xl font-black text-white uppercase tracking-wide" id="setup-title">Выберите свою страну</h2>
+                <div class="relative z-20">
+                    <button id="region-btn" onclick="toggleRegion()" class="bg-gray-900/60 border border-gray-600/50 text-white px-5 py-2.5 rounded-lg flex items-center gap-3 transition-all w-full md:w-auto justify-center min-w-[220px] shadow-inner cursor-pointer hover:bg-gray-800 hover:scale-105 hover:border-blue-500/50 active:shadow-inner active:shadow-gray-900 group">
+                        <span id="current-region-name" class="font-bold text-blue-100/80 group-hover:text-blue-300 transition-colors">🏰 Global</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div id="country-selection" class="grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-4 mb-8 min-h-[220px] transition-all duration-300 relative z-10"></div>
+            
+            <div class="mb-8 text-left relative z-10 bg-gray-900/50 p-6 rounded-xl border border-gray-700/50">
+                <div class="flex items-center justify-between mb-4">
+                    <label class="text-gray-400 text-sm font-bold uppercase tracking-wider">Ваша статистика</label>
+                    <div class="h-px bg-gray-700 flex-1 ml-4"></div>
+                </div>
+                <div class="grid grid-cols-3 gap-4 text-center">
+                    <div class="bg-gray-800 p-4 rounded-lg border border-green-800/30">
+                        <div id="stat-wins" class="text-3xl font-bold text-green-400">0</div>
+                        <div class="text-xs text-gray-400 uppercase tracking-wider">🏆 Побед</div>
+                    </div>
+                    <div class="bg-gray-800 p-4 rounded-lg border border-red-800/30">
+                        <div id="stat-losses" class="text-3xl font-bold text-red-400">0</div>
+                        <div class="text-xs text-gray-400 uppercase tracking-wider">💥 Поражений</div>
+                    </div>
+                    <div class="bg-gray-800 p-4 rounded-lg border border-blue-800/30">
+                        <div id="stat-total" class="text-3xl font-bold text-blue-400">0</div>
+                        <div class="text-xs text-gray-400 uppercase tracking-wider">🎮 Всего игр</div>
+                    </div>
+                </div>
+                <button onclick="clearAllStats()" class="mt-4 text-xs text-red-400 hover:text-red-300 hover:underline">Сбросить статистику</button>
+            </div>
+
+            <div class="mb-8 text-left relative z-10 bg-gray-900/50 p-6 rounded-xl border border-gray-700/50">
+                <div class="flex items-center justify-between mb-4">
+                    <label class="text-gray-400 text-sm font-bold uppercase tracking-wider" id="game-mode-label">Настройки игры</label>
+                    <div class="h-px bg-gray-700 flex-1 ml-4"></div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                     <label class="relative flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-gray-700/50 hover:bg-gray-800/50 bg-gradient-to-br from-gray-800 to-gray-900 transition-all hover:border-blue-500/50 group">
+                        <input type="checkbox" id="extended-mode-check" onchange="toggleExtendedMode()" class="form-checkbox w-5 h-5 text-blue-500 rounded border-gray-600 focus:ring-offset-gray-900">
+                        <span id="label-extended-mode" class="font-bold text-gray-300 group-hover:text-blue-300 transition-colors">Расширенный режим (+7 стран)</span>
+                        <div class="absolute inset-0 border-2 border-transparent group-hover:border-blue-500/20 rounded-xl transition-all pointer-events-none"></div>
+                    </label>
+                    <label id="duel-mode-label" class="relative flex items-center gap-3 p-3 rounded-xl border border-gray-700/50 bg-gradient-to-br from-gray-800 to-gray-900 opacity-50 cursor-not-allowed transition-all">
+                        <input type="checkbox" id="duel-mode-check" onchange="toggleDuelMode()" class="form-checkbox w-5 h-5 text-purple-500 rounded border-gray-600 focus:ring-offset-gray-900" disabled>
+                        <span id="label-mode-duel-check" class="font-bold text-gray-300">⚔️ Дуэль / 2 Игрока</span>
+                    </label>
+                </div>
+
+                <label class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3 block" id="lbl-turn-rules">Правила ходов</label>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <label class="cursor-pointer relative group">
+                        <input type="radio" name="gamemode" value="relay" checked class="peer sr-only">
+                        <div class="p-4 rounded-xl border border-gray-700 bg-gray-800 hover:bg-gray-750 peer-checked:bg-blue-900/30 peer-checked:border-blue-500 peer-checked:ring-1 peer-checked:ring-blue-500/50 peer-checked:scale-105 peer-checked:shadow-lg peer-checked:shadow-blue-500/20 transition-all h-full flex flex-col gap-2">
+                            <div class="text-2xl">🔥</div>
+                            <span id="label-mode-relay" class="font-bold text-sm text-gray-300 peer-checked:text-blue-200">Горячая картошка</span>
+                            <div id="desc-mode-relay" class="text-[10px] text-gray-500 leading-tight">Цель становится активным игроком.</div>
+                        </div>
+                    </label>
+                    
+                    <label class="cursor-pointer relative group">
+                        <input type="radio" name="gamemode" value="random" class="peer sr-only">
+                        <div class="p-4 rounded-xl border border-gray-700 bg-gray-800 hover:bg-gray-750 peer-checked:bg-blue-900/30 peer-checked:border-blue-500 peer-checked:ring-1 peer-checked:ring-blue-500/50 peer-checked:scale-105 peer-checked:shadow-lg peer-checked:shadow-blue-500/20 transition-all h-full flex flex-col gap-2">
+                            <div class="text-2xl">🎲</div>
+                            <span id="label-mode-random" class="font-bold text-sm text-gray-300 peer-checked:text-blue-200">Случайность</span>
+                             <div id="desc-mode-random" class="text-[10px] text-gray-500 leading-tight">Ход передается случайному игроку.</div>
+                        </div>
+                    </label>
+
+                    <label class="cursor-pointer relative group">
+                        <input type="radio" name="gamemode" value="multistep" class="peer sr-only">
+                        <div class="p-4 rounded-xl border border-gray-700 bg-gray-800 hover:bg-gray-750 peer-checked:bg-blue-900/30 peer-checked:border-blue-500 peer-checked:ring-1 peer-checked:ring-blue-500/50 peer-checked:scale-105 peer-checked:shadow-lg peer-checked:shadow-blue-500/20 transition-all h-full flex flex-col gap-2">
+                            <div class="text-2xl">🌊</div>
+                            <span id="label-mode-multistep" class="font-bold text-sm text-gray-300 peer-checked:text-blue-200">Волна</span>
+                             <div id="desc-mode-multistep" class="text-[10px] text-gray-500 leading-tight">Все страны ходят по очереди за раунд.</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <button onclick="startGame()" class="w-full md:w-auto min-w-[200px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-lg px-8 py-4 rounded-xl font-bold shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transform transition-all duration-200 hover:scale-[1.02] active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] relative overflow-hidden group" id="start-btn" disabled>
+                <span class="relative z-10">Начать игру</span>
+                <div class="absolute inset-0 bg-white/20 translate-x-[-100%] skew-x-[-15deg] group-hover:animate-[shimmer_1s_infinite] pointer-events-none"></div>
+            </button>
+        </div>
+
+        <!-- Game UI -->
+        <div id="game-ui" class="hidden">
+            <div class="flex justify-between items-center mb-4 bg-gray-800 p-3 rounded">
+                <div><span class="text-gray-400" id="ui-turn">Ход №:</span> <span id="turn-counter" class="font-bold text-white">1</span></div>
+                <div class="flex items-center gap-2">
+                    <button id="ui-pause-btn" onclick="pauseGame()" class="hidden text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded" title="Pause/Resume">⏸️</button>
+                    <button onclick="restartGame()" class="text-xs text-red-400 hover:underline" id="ui-restart">Заново</button>
+                </div>
+                <div id="turn-status" class="font-bold text-yellow-400">Ожидание...</div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4" id="countries-grid"></div>
+
+                <div class="flex flex-col gap-4 h-[calc(100vh-150px)] sticky top-4">
+                    <div id="action-panel" class="bg-gray-800 p-4 rounded-lg shadow-lg border border-gray-700">
+                        <h3 class="text-lg font-bold mb-3 text-blue-300" id="ui-actions">Ваши действия</h3>
+                        <div id="current-weapon-info" class="mb-3 text-sm bg-gray-900 p-2 rounded border border-gray-600 text-center hidden">
+                            <span class="text-gray-400" id="ui-dropped-weapon">Вам выпало оружие:</span><br>
+                            <span id="dropped-weapon-name" class="text-yellow-400 font-bold text-lg">---</span>
+                        </div>
+                        <div id="action-buttons" class="grid grid-cols-2 gap-2"></div>
+                        <div id="target-selection" class="mt-4 hidden">
+                            <p class="text-sm text-gray-400 mb-2" id="ui-select-target">Выберите цель:</p>
+                            <select id="target-select" class="w-full bg-gray-700 text-white p-2 rounded mb-2"></select>
+                            <div class="flex gap-2">
+                                <button onclick="confirmAction()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-1 rounded" id="btn-confirm">Выполнить</button>
+                                <button onclick="cancelAction()" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-1 rounded" id="btn-cancel">Отмена</button>
+                            </div>
+                        </div>
+                        <div id="player-status-msg" class="mt-2 text-sm text-red-400 hidden"></div>
+                    </div>
+
+                    <div class="bg-gray-800 p-4 rounded-lg shadow-lg border border-gray-700 flex-1 overflow-hidden flex flex-col">
+                        <h3 class="text-lg font-bold mb-2 text-gray-300" id="ui-log">Журнал событий</h3>
+                        <div id="game-log" class="flex-1 overflow-y-auto space-y-2 text-sm pr-2 font-mono bg-gray-900 p-2 rounded border border-gray-700"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lore Modal -->
+    <div id="lore-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center hidden z-[60] backdrop-blur-sm transition-opacity duration-300">
+        <div class="bg-gray-800 border border-gray-700 p-6 rounded-2xl max-w-md w-full m-4 shadow-2xl transform scale-100 transition-transform duration-300 relative overflow-hidden">
+             <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-yellow-500 to-transparent opacity-50"></div>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-yellow-400 flex items-center gap-2"><span class="text-3xl">📜</span> <span id="lore-title">Lore Alliances</span></h2>
+                <button onclick="toggleLore()" class="text-gray-400 hover:text-white transition text-2xl">&times;</button>
+            </div>
+            <div id="lore-list" class="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                <!-- Content injected by JS -->
+            </div>
+             <p class="text-xs text-gray-500 mt-4 text-center italic" id="lore-footer">Alliances are automatically formed at start.</p>
+        </div>
+    </div>
+
+    <!-- Dev Modal -->
+    <div id="dev-modal" class="fixed inset-0 bg-black/90 flex items-center justify-center hidden z-[70] backdrop-blur-md overflow-y-auto">
+        <div class="bg-gray-900 border-2 border-red-500/50 p-6 rounded-2xl max-w-2xl w-full m-4 shadow-[0_0_50px_rgba(239,68,68,0.2)]">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black text-red-500 flex items-center gap-2">👨‍💻 DEV CONSOLE</h2>
+                <button onclick="toggleDevModal()" class="text-gray-400 hover:text-white transition text-2xl">&times;</button>
+            </div>
+            
+            <!-- Stats Editor Section -->
+            <div class="mb-6 pb-6 border-b border-gray-700">
+                <h3 class="text-sm font-bold text-blue-400 mb-4">📊 Редактор Статистики</h3>
+                <div class="grid grid-cols-3 gap-3 mb-4">
+                    <div class="flex flex-col gap-2">
+                        <label class="text-xs text-gray-400 font-bold">Побед</label>
+                        <input id="dev-stat-wins" type="number" value="0" class="bg-gray-800 border border-gray-700 text-white px-3 py-2 rounded text-sm">
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <label class="text-xs text-gray-400 font-bold">Поражений</label>
+                        <input id="dev-stat-losses" type="number" value="0" class="bg-gray-800 border border-gray-700 text-white px-3 py-2 rounded text-sm">
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <label class="text-xs text-gray-400 font-bold">Всего игр</label>
+                        <input id="dev-stat-total" type="number" value="0" class="bg-gray-800 border border-gray-700 text-white px-3 py-2 rounded text-sm">
+                    </div>
+                </div>
+                <button onclick="devSaveStats()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold text-xs transition">💾 Сохранить</button>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="cheatUnlock()" class="p-3 bg-gray-800 border border-gray-700 hover:border-green-500 rounded-lg text-xs font-bold transition text-green-400">🔓 Unlock Countries</button>
+                <button onclick="cheatHealAll()" class="p-3 bg-gray-800 border border-gray-700 hover:border-green-500 rounded-lg text-xs font-bold transition text-green-400">❤️ Heal Self (Full)</button>
+                <button onclick="cheatNukes()" class="p-3 bg-gray-800 border border-gray-700 hover:border-yellow-500 rounded-lg text-xs font-bold transition text-yellow-400">☢️ Give 5 Nukes</button>
+                <button onclick="cheatInfiniteShield()" class="p-3 bg-gray-800 border border-gray-700 hover:border-blue-500 rounded-lg text-xs font-bold transition text-blue-400">🛡️ Infinite Shield</button>
+                <button onclick="cheatForcePeace()" class="p-3 bg-gray-800 border border-gray-700 hover:border-indigo-500 rounded-lg text-xs font-bold transition text-indigo-400">🕊️ Force Peace</button>
+                <button onclick="cheatForceWar()" class="p-3 bg-gray-800 border border-gray-700 hover:border-orange-500 rounded-lg text-xs font-bold transition text-orange-400">💔 Force War</button>
+                <button onclick="cheatRerollWeapon()" class="p-3 bg-gray-800 border border-gray-700 hover:border-cyan-500 rounded-lg text-xs font-bold transition text-cyan-400">🎲 Reroll Weapon</button>
+                <button onclick="cheatMeteorShower()" class="p-3 bg-gray-800 border border-gray-700 hover:border-rose-500 rounded-lg text-xs font-bold transition text-rose-400">☄️ Meteor Shower</button>
+                <button onclick="cheatLifeSteal()" class="p-3 bg-gray-800 border border-gray-700 hover:border-pink-500 rounded-lg text-xs font-bold transition text-pink-400">🧛 Life Steal</button>
+                <button onclick="cheatKillAll()" class="p-3 bg-gray-800 border border-gray-700 hover:border-red-500 rounded-lg text-xs font-bold transition text-red-400">☠️ 1 HP Everyone</button>
+                <button onclick="cheatReviveAll()" class="p-3 bg-gray-800 border border-gray-700 hover:border-purple-500 rounded-lg text-xs font-bold transition text-purple-400">🧟 Revive All Dead</button>
+                <button onclick="cheatSkipTurn()" class="p-3 bg-gray-800 border border-gray-700 hover:border-gray-500 rounded-lg text-xs font-bold transition text-gray-400">⏭️ Skip Turn</button>
+                <button onclick="cheatGodMode()" class="p-3 bg-gray-800 border border-gray-700 hover:border-yellow-300 rounded-lg text-xs font-bold transition text-yellow-300">⚡ God Mode</button>
+                <button onclick="cheatInstantWin()" class="p-3 bg-red-900/50 border border-red-700 hover:border-red-500 rounded-lg text-xs font-bold transition text-red-200">💀 Instant Win</button>
+                <button onclick="cheatTitanMode()" class="p-3 bg-gray-800 border border-gray-700 hover:border-teal-500 rounded-lg text-xs font-bold transition text-teal-400">🐋 Titan Mode</button>
+                <button onclick="cheatNoCooldowns()" class="p-3 bg-gray-800 border border-gray-700 hover:border-yellow-600 rounded-lg text-xs font-bold transition text-yellow-500">🔥 No Cooldowns</button>
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-800 text-[10px] text-gray-500 font-mono text-center">
+                Cheats disable achievements. Just kidding, there are no achievements.
+            </div>
+        </div>
+    </div>
+
+    <!-- Alliance Offer Modal (Hard Mode) -->
+    <div id="alliance-offer-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center hidden z-[80] backdrop-blur-sm">
+        <div class="bg-gray-800 p-6 rounded-2xl border-2 border-yellow-500 max-w-sm w-full text-center shadow-2xl transform transition-all scale-100">
+            <div class="text-5xl mb-4 animate-bounce">💌</div>
+            <h3 class="text-2xl font-bold text-white mb-2" id="offer-title">Предложение союза!</h3>
+            <p class="text-gray-300 mb-6"><span id="offer-country" class="font-bold text-yellow-400 text-xl"></span> <span id="offer-text">предлагает альянс.</span></p>
+            <p class="text-xs text-gray-400 mb-4" id="offer-hearts-required"></p>
+            <div class="grid grid-cols-2 gap-4">
+                <button onclick="respondAlliance(true)" id="btn-accept-ally" class="bg-green-600 hover:bg-green-700 text-white py-2 rounded-xl font-bold transition transform hover:scale-105 shadow-lg shadow-green-900/50">Принять</button>
+                <button onclick="respondAlliance(false)" id="btn-reject-ally" class="bg-red-600 hover:bg-red-700 text-white py-2 rounded-xl font-bold transition transform hover:scale-105 shadow-lg shadow-red-900/50">Отказать</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Victory Modal -->
+    <div id="victory-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center hidden z-50">
+        <div class="bg-gray-800 p-8 rounded-lg max-w-md text-center border-2 border-yellow-500">
+            <h2 class="text-3xl font-bold text-yellow-400 mb-4" id="ui-game-over">Игра окончена!</h2>
+            <p id="victory-message" class="text-xl text-white mb-6"></p>
+            <button onclick="restartGame()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-bold" id="btn-play-again">Сыграть снова</button>
+        </div>
+    </div>
+
+    <div class="fixed bottom-2 left-2 text-[10px] text-gray-600 font-mono opacity-50 pointer-events-none select-none z-40">alpha 0.3.1 (full trans)</div>
+
+    <script>
+        // Overwrite renderGame to add micro-animations
+        function renderGame() {
+            if (gameState.mode === 'multistep') { document.getElementById('ui-turn').innerText = t('uiRound'); document.getElementById('turn-counter').innerText = gameState.roundCount; } 
+            else { document.getElementById('ui-turn').innerText = t('uiTurn'); document.getElementById('turn-counter').innerText = gameState.moveCount; }
+            
+            if (!gameState.badgeState) gameState.badgeState = {};
+
+            const grid = document.getElementById('countries-grid'); grid.innerHTML = '';
+            gameState.players.forEach(p => {
+                const card = document.createElement('div');
+                const isP1 = p.id === gameState.userPlayerId; const isP2 = p.id === gameState.secondPlayerId;
+                const statusClass = p.isAlive ? 'card-alive bg-gray-800' : 'card-dead bg-gray-900';
+                let userClass = ''; if (isP1) userClass = 'ring-2 ring-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]'; if (isP2) userClass = 'ring-2 ring-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]';
+                let activeHumanId = null; if (gameState.activePlayerId === gameState.userPlayerId) activeHumanId = gameState.userPlayerId; if (gameState.activePlayerId === gameState.secondPlayerId) activeHumanId = gameState.secondPlayerId; if (!activeHumanId) activeHumanId = gameState.userPlayerId;
+                let isAllyBool = false; if (activeHumanId && p.isAlive && p.id !== activeHumanId) { if (isAlly(activeHumanId, p.id)) { isAllyBool = true; } }
+                const allyClass = isAllyBool ? 'card-ally' : '';
+                
+                if (p.hp > p.maxHp) p.maxHp = p.hp;
+                const hpPercent = (p.hp / p.maxHp) * 100;
+                let hpColor = 'bg-green-500'; if (hpPercent < 50) hpColor = 'bg-yellow-500'; if (hpPercent < 25) hpColor = 'bg-red-500';
+                
+                // Badge Logic
+                const prev = gameState.badgeState[p.id] || { shield: 0, nukes: 0, dot: 0, isAlly: false };
+                
+                const shieldAnim = (p.shield > 0 && prev.shield === 0) ? 'anim-pop-in' : '';
+                const shieldBadge = p.shield > 0 ? `<span class="bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full animate-pulse ${shieldAnim}" style="animation-delay: 0.1s" title="${TRANSLATIONS[currentLang].badges.shield}">🛡️ ${p.shield}</span>` : '';
+                
+                const nukeAnim = (p.nukes > 0 && prev.nukes === 0) ? 'anim-pop-in' : '';
+                const nukeBadge = p.nukes > 0 ? `<span class="bg-yellow-600 text-white text-xs px-2 py-0.5 rounded-full ${nukeAnim}" style="animation-delay: 0.2s" title="${TRANSLATIONS[currentLang].badges.nukes}">☢️ ${p.nukes}</span>` : '';
+                
+                const dotAnim = (p.dotTurns > 0 && prev.dot === 0) ? 'anim-pop-in' : '';
+                const dotBadge = p.dotTurns > 0 ? `<span class="bg-green-900 text-green-200 border border-green-500 text-xs px-2 py-0.5 rounded-full animate-pulse ${dotAnim}" style="animation-delay: 0.3s" title="${TRANSLATIONS[currentLang].badges.poison}">🧪 ${p.dotTurns}</span>` : '';
+                
+                const allyAnim = (isAllyBool && !prev.isAlly) ? 'anim-pop-in' : '';
+                const allyBadge = isAllyBool ? `<span class="bg-indigo-600 text-white text-xs px-2 py-0.5 rounded-full ${allyAnim}" style="animation-delay: 0.4s" title="${TRANSLATIONS[currentLang].badges.ally}">🤝 ${t('ally')}</span>` : '';
+                
+                // Update State
+                gameState.badgeState[p.id] = { shield: p.shield, nukes: p.nukes, dot: p.dotTurns, isAlly: isAllyBool };
+
+                // MICRO ANIMATIONS: Active Turn Highlight
+                let activePulseClass = '';
+                if (p.isAlive && p.id === gameState.activePlayerId) activePulseClass = 'active-turn-highlight border-2 border-blue-500/50';
+
+                // Persistent Effect Pulse (Damage/Heal)
+                let effectClass = '';
+                if (gameState.activeEffects && gameState.activeEffects[p.id]) {
+                    const eff = gameState.activeEffects[p.id];
+                    if (Date.now() - eff.start < 3000) {
+                        if (eff.type === 'damage') effectClass = 'pulse-damage-effect';
+                        if (eff.type === 'heal') effectClass = 'pulse-heal-effect';
+                    } else {
+                        delete gameState.activeEffects[p.id];
+                    }
+                }
+                
+                // Titan Mode Persistence Check
+                let titanStyle = '';
+                if (p.isTitan) {
+                    titanStyle = 'transform: scale(1.1); z-index: 30;';
+                }
+
+                card.id = `card-${p.id}`; card.className = `p-4 rounded shadow relative transition-all ${statusClass} ${userClass} ${allyClass} ${activePulseClass} ${effectClass}`;
+                if (titanStyle) card.style = titanStyle;
+                
+                const localizedName = getLoc(COUNTRIES_CONFIG.find(c => c.id === p.id).name);
+                let playerLabel = ''; if (isP1) playerLabel = `<span class="text-blue-400 text-xs font-bold">[${t('p1')}]</span>`; if (isP2) playerLabel = `<span class="text-purple-400 text-xs font-bold">[${t('p2')}]</span>`;
+                
+                // MICRO ANIMATIONS: HP Glint - Only if effect is active
+                const hasEffect = gameState.activeEffects && gameState.activeEffects[p.id];
+                const glintClass = hasEffect ? 'hp-glint-active' : '';
+
+                card.innerHTML = `<div class="flex justify-between items-start mb-2"><div class="flex items-center gap-2"><span class="text-3xl">${p.flag}</span><div><div class="font-bold leading-tight flex items-center gap-1">${localizedName} ${playerLabel}</div><div class="flex flex-wrap gap-1 mt-1 h-5">${shieldBadge} ${nukeBadge} ${dotBadge} ${allyBadge}</div></div></div><div class="text-xl font-bold ${p.hp > 0 ? 'text-white' : 'text-gray-600'}">${p.hp} <span class="text-xs text-gray-500">${t('hp')}</span></div></div>${p.isAlive ? `<div class="w-full bg-gray-700 rounded-full h-2.5 mb-1"><div class="${hpColor} h-2.5 rounded-full transition-all duration-500 hp-glint-container ${glintClass}" style="width: ${hpPercent}%"></div></div>` : `<div class="text-red-500 font-bold text-center text-sm">${t('destroyed')}</div>`}`;
+                grid.appendChild(card);
+            });
+            const activeId = gameState.activePlayerId;
+            const isHumanTurn = activeId === gameState.userPlayerId || activeId === gameState.secondPlayerId;
+            const activeHuman = getPlayer(activeId);
+            const actionsContainer = document.getElementById('action-buttons');
+            const actionPanel = document.getElementById('action-panel');
+            const statusMsg = document.getElementById('player-status-msg');
+            const currentWeaponInfo = document.getElementById('current-weapon-info');
+            const droppedWeaponName = document.getElementById('dropped-weapon-name');
+            if (!isHumanTurn) {
+                actionPanel.classList.add('opacity-50', 'pointer-events-none');
+                statusMsg.textContent = t('msgTurnOf') + getCountryName(gameState.activePlayerId);
+                statusMsg.classList.remove('hidden'); currentWeaponInfo.classList.remove('hidden'); droppedWeaponName.textContent = "???";
+            } else {
+                actionPanel.classList.remove('opacity-50', 'pointer-events-none');
+                statusMsg.classList.add('hidden'); currentWeaponInfo.classList.remove('hidden');
+                const droppedWeapon = OFFENSIVE_WEAPONS[gameState.userCurrentWeapon];
+                droppedWeaponName.textContent = droppedWeapon ? getLoc(droppedWeapon.name) : '???';
+                const user = activeHuman; actionsContainer.innerHTML = '';
+                if (droppedWeapon) {
+                    const btn = document.createElement('button');
+                    btn.className = `p-2 rounded text-xs font-bold transition flex flex-col items-center justify-center gap-1 border border-gray-600 bg-gray-700 hover:bg-red-900 hover:border-red-500 text-gray-200`;
+                    btn.onclick = () => prepareAction(gameState.userCurrentWeapon);
+                    btn.innerHTML = `<span>⚔️ ${t('attackBtn')}</span><span class="text-[10px] font-normal opacity-75">${getLoc(droppedWeapon.desc)}</span>`;
+                    actionsContainer.appendChild(btn);
+                }
+                if (user.nukes > 0) {
+                    const nukeBtn = document.createElement('button');
+                    const disabled = user.nukeCd > 0;
+                    nukeBtn.className = `p-2 rounded text-xs font-bold transition flex flex-col items-center justify-center gap-1 border border-gray-600 ${disabled ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-yellow-900/50 hover:bg-yellow-800 hover:border-yellow-500 text-yellow-200'}`;
+                    nukeBtn.disabled = disabled; nukeBtn.onclick = () => prepareAction('nuke');
+                    const extraInfo = user.nukeCd > 0 ? `(CD: ${user.nukeCd})` : `(x${user.nukes})`;
+                    nukeBtn.innerHTML = `<span>☢️ ${t('nukeBtn')} ${extraInfo}</span>`;
+                    actionsContainer.appendChild(nukeBtn);
+                }
+                Object.entries(FRIENDLY_ACTIONS).forEach(([key, act]) => {
+                     const btn = document.createElement('button');
+                     let disabled = false; 
+                     if (key === 'heart' && user.hp <= 1) disabled = true;
+                     if (key === 'heart' && user.allies.length >= user.maxAllies && aiDifficulty === 'hard') disabled = true;
+                     if (key === 'revive') {
+                        const hasDead = gameState.players.some(p => !p.isAlive);
+                        if (user.hp <= 2 || !hasDead) disabled = true;
+                     }
+                     btn.className = `p-2 rounded text-xs font-bold transition flex flex-col items-center justify-center gap-1 border border-gray-600 ${disabled ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-gray-700 hover:bg-green-900 hover:border-green-500 text-gray-200'}`;
+                     btn.disabled = disabled; btn.onclick = () => prepareAction(key);
+                     btn.innerHTML = `<span>${getLoc(act.name)}</span><span class="text-[10px] font-normal opacity-75">${getLoc(act.desc)}</span>`;
+                     actionsContainer.appendChild(btn);
+                });
+            }
+        }
+
+        let currentLang = 'ru';
+        let languageChosen = false;
+
+        const TRANSLATIONS = {
+            ru: {
+                headerTitle: "Падение Флагов",
+                headerDesc: 'Пошаговая стратегия.',
+                headerRules: "Победитель может быть только один. Альянсы создаются сердцами, но они хрупкие.",
+                setupTitle: "Выберите свою страну",
+                gameModeLabel: "Настройки игры",
+                lblTurnRules: "Правила ходов",
+                modeHotPotato: "🔥 Горячая картошка",
+                modeRandom: "🎲 Случайность",
+                modeMultistep: "🌊 Волна",
+                modeDescs: {
+                    relay: "Цель становится активным игроком.",
+                    random: "Ход передается случайному игроку.",
+                    multistep: "Все страны ходят по очереди за раунд."
+                },
+                modeDuelCheck: "⚔️ Дуэль / 2 Игрока",
+                extendedModeLabel: "Расширенный режим (+7 стран)",
+                btnStart: "Начать игру",
+                uiTurn: "Ход №:",
+                uiRound: "Раунд №:",
+                uiRestart: "Заново",
+                uiActions: "Ваши действия",
+                uiDroppedWeapon: "Вам выпало оружие:",
+                uiSelectTarget: "Выберите цель:",
+                btnConfirm: "Выполнить",
+                btnCancel: "Отмена",
+                uiLog: "Журнал событий",
+                uiGameOver: "Игра окончена!",
+                btnPlayAgain: "Сыграть снова",
+                turnStatusWait: "Ожидание...",
+                turnStatusYou: "Ваш ход!",
+                turnStatusP1: "Игрок 1, ваш ход!",
+                turnStatusP2: "Игрок 2, ваш ход!",
+                turnStatusMove: "Ход: ",
+                msgTurnOf: "Сейчас ходит: ",
+                msgNoTargets: "Нет доступных целей!",
+                ally: "Союзник",
+                hp: "HP",
+                destroyed: "УНИЧТОЖЕН",
+                attackBtn: "Атаковать",
+                nukeBtn: "Ядерный удар",
+                p1: "И1", p2: "И2",
+                settings: {
+                    snow: "Снег",
+                    snowOn: "Снег",
+                    spring: "Листья",
+                    springOn: "Листья",
+                    summer: "Лето",
+                    summerOn: "Лето",
+                    autumn: "Осень",
+                    autumnOn: "Осень",
+                    winter: "Снег",
+                    winterOn: "Снег",
+                    anim: "Анимация",
+                    animOn: "Аним: ВКЛ",
+                    animOff: "Аним: ВЫКЛ",
+                    glass: "Жидкое стекло",
+                    glassOn: "Эффект стекла"
+                },
+                badges: {
+                    shield: "Щит",
+                    nukes: "Ядерка",
+                    poison: "Яд",
+                    ally: "Союз"
+                },
+                regions: {
+                    global: "Глобальный",
+                    east: "Вост. Европа",
+                    nato: "НАТО",
+                    eu: "Евросоюз"
+                },
+                difficulty: {
+                    VERY_EASY: "ОЧЕНЬ ЛЕГКО", EASY: "ЛЕГКО", MEDIUM: "СРЕДНЕ", HARD: "СЛОЖНО", VERY_HARD: "ОЧЕНЬ СЛОЖНО", LUCK: "ВЕЗЕНИЕ"
+                },
+                logs: {
+                    start: "🏁 Игра началась! Вы играете за {0}.",
+                    startDuel: "⚔️ Дуэль началась! Вы играете за {0} и {1}.",
+                    modeRelay: "📝 Правила: Горячая картошка. Цель становится активным игроком.",
+                    modeRandom: "📝 Правила: Случайность. Ход передается случайному игроку.",
+                    modeMultistep: "📝 Правила: Волна. Все страны ходят по очереди за раунд.",
+                    roundStart: "🔔 --- РАУНД {0} ---",
+                    allianceForm: "💟 Альянс сформирован: {0} и {1}!",
+                    allianceBreak: "💔 Альянс РАЗОРВАН между {0} и {1}!",
+                    dot: "🧪 {0} страдает от яда.",
+                    shieldAbsorb: "🛡️ Щит {0} танчит {1} урона.",
+                    shieldPierce: "🏹 {0} пробивает щит насквозь!",
+                    kill: "☠️ {0} УНИЧТОЖЕН! F.",
+                    lootNukes: "☢️🤯 {0} лутает {1} ядерных заряда с трупа!",
+                    dmgDealt: "⚔️ {0} вносит <span class='text-red-400 font-bold'>-{1} HP</span> по {2}.",
+                    dmgTaken: "🤕 {0} получает <span class='text-red-400 font-bold'>-{1} HP</span>.",
+                    potionThrow: "🍾 {0} кидает отраву в {1}!",
+                    nukeLaunch: "🚀☢️ {0} запускает ЯДЕРКУ в {1}! БЕГИТЕ!",
+                    heartGive: "🥰 {0} дарит сердечко {1}. Мир, дружба, жвачка!",
+                    revive: "✨👼 {0} воскрешает {1}! Чудо!",
+                    nukeDrop: "💣☢️ {0} сбрасывает БОМБУ на {1}! БАБАХ!",
+                    winDraw: "💀 Ничья! Все погибли. Мрачно...",
+                    winSolo: "👑 ПОБЕДА! Выжила только: {0}!"
+                }
+            },
+            en: {
+                headerTitle: "Fall of Flags",
+                headerDesc: "Turn-based strategy: 'Hot Potato'. Whoever you target moves next!",
+                headerRules: "There can be only one winner. Alliances are forged with hearts, but they are fragile.",
+                setupTitle: "Choose your country",
+                gameModeLabel: "Game Settings",
+                lblTurnRules: "Turn Rules",
+                modeHotPotato: "🔥 Hot Potato (Relay)",
+                modeRandom: "🎲 Randomness (RNG)",
+                modeMultistep: "🌊 Wave (Round Robin)",
+                modeDescs: {
+                    relay: "Target becomes the next active player.",
+                    random: "Next turn is completely random.",
+                    multistep: "All countries move once per round."
+                },
+                modeDuelCheck: "⚔️ Duel / 2 Players",
+                extendedModeLabel: "Extended Mode (+7 Countries)",
+                btnStart: "Start Game",
+                uiTurn: "Turn:",
+                uiRound: "Round:",
+                uiRestart: "Restart",
+                uiActions: "Your Actions",
+                uiDroppedWeapon: "Weapon acquired:",
+                uiSelectTarget: "Select Target:",
+                btnConfirm: "Confirm",
+                btnCancel: "Cancel",
+                uiLog: "Game Log",
+                uiGameOver: "Game Over!",
+                btnPlayAgain: "Play Again",
+                turnStatusWait: "Waiting...",
+                turnStatusYou: "Your Turn!",
+                turnStatusP1: "Player 1, Your Turn!",
+                turnStatusP2: "Player 2, Your Turn!",
+                turnStatusMove: "Turn: ",
+                msgTurnOf: "Current turn: ",
+                msgNoTargets: "No targets available!",
+                ally: "Ally",
+                hp: "HP",
+                destroyed: "ELIMINATED",
+                attackBtn: "Attack",
+                nukeBtn: "Nuclear Strike",
+                p1: "P1", p2: "P2",
+                settings: {
+                    snow: "Snow",
+                    snowOn: "Snowing",
+                    spring: "Leaves",
+                    springOn: "Spring",
+                    summer: "Summer",
+                    summerOn: "Summer",
+                    autumn: "Autumn",
+                    autumnOn: "Autumn",
+                    winter: "Snow",
+                    winterOn: "Snowing",
+                    anim: "Animation",
+                    animOn: "Anim: ON",
+                    animOff: "Anim: OFF",
+                    glass: "Liquid Glass",
+                    glassOn: "Glass Mode"
+                },
+                badges: {
+                    shield: "Shield",
+                    nukes: "Nuke",
+                    poison: "Poison",
+                    ally: "Ally"
+                },
+                regions: {
+                    global: "Global",
+                    east: "East Europe",
+                    nato: "NATO",
+                    eu: "EU"
+                },
+                difficulty: {
+                    VERY_EASY: "VERY EASY", EASY: "EASY", MEDIUM: "MEDIUM", HARD: "HARD", VERY_HARD: "VERY HARD", LUCK: "LUCK"
+                },
+                logs: {
+                    start: "🏁 Game started! You are playing as {0}.",
+                    startDuel: "⚔️ Duel started! You are playing as {0} and {1}.",
+                    modeRelay: "📝 Rules: Hot Potato. Target becomes next active player.",
+                    modeRandom: "📝 Rules: Randomness. Next turn is completely random.",
+                    modeMultistep: "📝 Rules: Wave. All countries move once per round.",
+                    roundStart: "🔔 --- ROUND {0} ---",
+                    allianceForm: "💟 Alliance formed: {0} and {1}!",
+                    allianceBreak: "💔 Alliance BROKEN between {0} and {1}.",
+                    dot: "🧪 {0} suffers from poison.",
+                    shieldAbsorb: "🛡️ {0}'s shield blocked {1} damage.",
+                    shieldPierce: "🏹 {0} takes piercing damage through shield!",
+                    kill: "☠️ {0} ELIMINATED! F.",
+                    lootNukes: "☢️🤯 {0} loots {1} nuclear charges!",
+                    dmgDealt: "⚔️ {0} deals <span class='text-red-400 font-bold'>-{1} HP</span> to {2}.",
+                    dmgTaken: "🤕 {0} takes <span class='text-red-400 font-bold'>-{1} HP</span>.",
+                    potionThrow: "🍾 {0} throws a potion at {1}!",
+                    nukeLaunch: "🚀☢️ {0} launches a NUKE at {1}! RUN!",
+                    heartGive: "🥰 {0} gives a heart to {1}. Peace and love!",
+                    revive: "✨👼 {0} revives {1}! A miracle!",
+                    nukeDrop: "💣☢️ {0} drops a NUKE on {1}! BOOM!",
+                    winDraw: "💀 Draw! Everyone perished.",
+                    winSolo: "👑 VICTORY! Survivor: {0}!"
+                }
+            }
+        };
+
+        function t(key) { return TRANSLATIONS[currentLang][key] || key; }
+        function tLog(key, ...args) {
+            let str = TRANSLATIONS[currentLang].logs[key] || key;
+            args.forEach((arg, i) => { str = str.replace(`{${i}}`, arg); });
+            return str;
+        }
+
+        // --- Toast/Notification System ---
+        const showNotification = (message, duration = 3000) => {
+            const isMobile = window.innerWidth <= 768;
+            
+            // Create container if not exists
+            let container = document.querySelector(`.toast-container.${isMobile ? 'mobile' : 'desktop'}`);
+            if (!container) {
+                container = document.createElement('div');
+                container.className = `toast-container ${isMobile ? 'mobile' : 'desktop'}`;
+                document.body.appendChild(container);
+            }
+            
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = 'toast-notification';
+            
+            const content = document.createElement('div');
+            content.className = 'toast-content';
+            
+            const p = document.createElement('p');
+            p.className = 'text-gray-100 text-sm font-medium';
+            p.textContent = message;
+            content.appendChild(p);
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'toast-close';
+            closeBtn.innerHTML = '✕';
+            closeBtn.type = 'button';
+            closeBtn.onclick = (e) => {
+                e.preventDefault();
+                notification.classList.add('hide');
+                setTimeout(() => notification.remove(), 300);
+            };
+            
+            notification.appendChild(closeBtn);
+            notification.appendChild(content);
+            container.appendChild(notification);
+            
+            // Auto-hide after duration
+            const timeoutId = setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.classList.add('hide');
+                    setTimeout(() => notification.remove(), 300);
+                }
+            }, duration);
+            
+            // Store timeout for manual close
+            notification.dataset.timeoutId = timeoutId;
+        };
+
+        // --- Game helpers ---
+        let isPaused = false;
+        const GAME_SAVE_KEY = 'fallofflags_saved_state';
+
+        function pauseGame() {
+            isPaused = !isPaused;
+            const pauseBtn = document.getElementById('ui-pause-btn');
+            if (pauseBtn) {
+                pauseBtn.innerText = isPaused ? '▶️' : '⏸️';
+                pauseBtn.title = isPaused ? (currentLang === 'ru' ? 'Продолжить' : 'Resume') : (currentLang === 'ru' ? 'Пауза' : 'Pause');
+            }
+            const status = document.getElementById('turn-status');
+            if (isPaused) {
+                status.innerText = currentLang === 'ru' ? 'Пауза' : 'Paused';
+                status.className = 'font-bold text-gray-400';
+            } else {
+                if (gameState.activePlayerId === gameState.userPlayerId) status.innerText = t('turnStatusYou');
+                else if (gameState.activePlayerId === gameState.secondPlayerId) status.innerText = t('turnStatusP2');
+                else {
+                    const p = getPlayer(gameState.activePlayerId);
+                    status.innerText = p ? t('turnStatusMove') + getCountryName(p.id) : t('turnStatusWait');
+                }
+                status.className = 'font-bold text-yellow-400';
+                processTurn();
+            }
+        }
+
+        function saveGameState() {
+            try {
+                const snapshot = JSON.stringify({
+                    gameState,
+                    currentLang,
+                    currentRegion,
+                    isSnowing,
+                    isGlass,
+                    enableAnimations,
+                    aiDifficulty
+                });
+                localStorage.setItem(GAME_SAVE_KEY, snapshot);
+                log(currentLang === 'ru' ? '💾 Состояние игры сохранено.' : '💾 Game state saved.', 'system');
+            } catch (e) {
+                console.error('Save failed:', e);
+                log(currentLang === 'ru' ? '⚠️ Не удалось сохранить.' : '⚠️ Save failed.', 'system');
+            }
+        }
+
+        function loadGameState() {
+            const data = localStorage.getItem(GAME_SAVE_KEY);
+            if (!data) {
+                showNotification(currentLang === 'ru' ? 'Нет сохранения.' : 'No saved game.');
+                return;
+            }
+            try {
+                const loaded = JSON.parse(data);
+                if (!loaded || !loaded.gameState) throw new Error('Invalid save');
+                Object.assign(gameState, loaded.gameState);
+                currentLang = loaded.currentLang || currentLang;
+                currentRegion = loaded.currentRegion || currentRegion;
+                isSnowing = loaded.isSnowing || false;
+                isGlass = loaded.isGlass || false;
+                enableAnimations = loaded.enableAnimations !== undefined ? loaded.enableAnimations : true;
+                aiDifficulty = loaded.aiDifficulty || 'normal';
+                setLanguage(currentLang);
+                updateRegionLabel();
+                renderGame();
+                document.getElementById('setup-screen').classList.add('hidden');
+                document.getElementById('game-ui').classList.remove('hidden');
+                log(currentLang === 'ru' ? '💾 Сохранение загружено.' : '💾 Game load complete.', 'system');
+            } catch (e) {
+                console.error('Load failed:', e);
+                showNotification(currentLang === 'ru' ? 'Ошибка загрузки сохранения.' : 'Failed to load save.');
+            }
+        }
+
+        function clearSavedGame() {
+            localStorage.removeItem(GAME_SAVE_KEY);
+            log(currentLang === 'ru' ? '🗑️ Сохранение удалено.' : '🗑️ Save cleared.', 'system');
+        }
+
+        // --- Settings State ---
+        let isSnowing = false;
+        let isGlass = false;
+        let enableAnimations = true;
+        let aiDifficulty = 'normal';
+        let snowInterval = null;
+
+        const GLOBE_ICON_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABQAAAAUACAYAAAAY5P/3AAAgAElEQVR4Aey9+ZMmx33ml1X1vm8fc+IakARJSASme8BDoo71akntwkQIAAAQIECBAgQIAAAQIECBAg0LaAALDt8dN7AgQIECBAgAABAgQIECBAgAABAisF/g/VloujswGnrAAAAABJRU5ErkJggg==";
+        const SNOW_ICON_SRC = GLOBE_ICON_SRC;
+
+        function toggleSettings() { document.getElementById('settings-dropdown').classList.toggle('hidden'); }
+
+        function setDifficulty(level) {
+            aiDifficulty = level;
+            document.getElementById('diff-easy').className = `flex-1 px-2 py-1 rounded border border-gray-600 hover:bg-gray-700 text-xs font-bold transition ${level === 'easy' ? 'bg-green-900 border-green-500' : ''}`;
+            document.getElementById('diff-normal').className = `flex-1 px-2 py-1 rounded border border-gray-600 hover:bg-gray-700 text-xs font-bold transition ${level === 'normal' ? 'bg-blue-900 border-blue-500' : ''}`;
+            document.getElementById('diff-hard').className = `flex-1 px-2 py-1 rounded border border-gray-600 hover:bg-gray-700 text-xs font-bold transition ${level === 'hard' ? 'bg-red-900 border-red-500 text-white' : 'text-red-400 border-red-900/50'}`;
+        }
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            languageChosen = true;
+            localStorage.setItem('fallofflags_language', lang);
+            showLanguageSavedHint();
+            document.getElementById('lang-en').className = `flex-1 px-2 py-1 rounded border border-gray-600 hover:bg-gray-700 text-xs font-bold transition ${lang === 'en' ? 'bg-blue-900 border-blue-500' : ''}`;
+            document.getElementById('lang-ru').className = `flex-1 px-2 py-1 rounded border border-gray-600 hover:bg-gray-700 text-xs font-bold transition ${lang === 'ru' ? 'bg-blue-900 border-blue-500' : ''}`;
+            
+            // Static text
+            document.getElementById('header-text').innerText = t('headerTitle');
+            const headerEmoji = document.getElementById('header-emoji');
+            if (isSnowing) {
+                headerEmoji.src = SNOW_ICON_SRC;
+                headerEmoji.alt = 'Snow';
+            } else {
+                headerEmoji.src = GLOBE_ICON_SRC;
+                headerEmoji.alt = 'Globe';
+            }
+            document.getElementById('header-desc').innerText = t('headerDesc');
+            document.getElementById('header-rules').innerText = t('headerRules');
+            document.getElementById('setup-title').innerText = t('setupTitle');
+            document.getElementById('game-mode-label').innerText = t('gameModeLabel');
+            document.getElementById('lbl-turn-rules').innerText = t('lblTurnRules');
+            
+            // Modes
+            document.getElementById('label-mode-relay').innerText = t('modeHotPotato');
+            document.getElementById('desc-mode-relay').innerText = TRANSLATIONS[currentLang].modeDescs.relay;
+            document.getElementById('label-mode-random').innerText = t('modeRandom');
+            document.getElementById('desc-mode-random').innerText = TRANSLATIONS[currentLang].modeDescs.random;
+            document.getElementById('label-mode-multistep').innerText = t('modeMultistep');
+            document.getElementById('desc-mode-multistep').innerText = TRANSLATIONS[currentLang].modeDescs.multistep;
+            
+            document.getElementById('label-mode-duel-check').innerText = t('modeDuelCheck');
+            document.getElementById('label-extended-mode').innerText = t('extendedModeLabel');
+            document.getElementById('start-btn').innerText = t('btnStart');
+            document.getElementById('ui-turn').innerText = gameState.mode === 'multistep' ? t('uiRound') : t('uiTurn');
+            document.getElementById('ui-restart').innerText = t('uiRestart');
+            document.getElementById('ui-actions').innerText = t('uiActions');
+            document.getElementById('ui-dropped-weapon').innerText = t('uiDroppedWeapon');
+            document.getElementById('ui-select-target').innerText = t('uiSelectTarget');
+            document.getElementById('btn-confirm').innerText = t('btnConfirm');
+            document.getElementById('btn-cancel').innerText = t('btnCancel');
+            document.getElementById('ui-log').innerText = t('uiLog');
+            document.getElementById('ui-game-over').innerText = t('uiGameOver');
+            document.getElementById('btn-play-again').innerText = t('btnPlayAgain');
+
+            // Update toggles
+            updateToggleButtons();
+
+            // Re-render
+            updateRegionLabel();
+            if (gameState.userPlayerId && !document.getElementById('setup-screen').classList.contains('hidden')) {
+                initSetup(false);
+            } else if (gameState.activePlayerId) {
+                renderGame();
+                const status = document.getElementById('turn-status');
+                if (gameState.activePlayerId === gameState.userPlayerId) status.innerText = t('turnStatusYou');
+                else if (gameState.activePlayerId === gameState.secondPlayerId) status.innerText = t('turnStatusP2');
+                else {
+                    const p = getPlayer(gameState.activePlayerId);
+                    if(p) status.innerText = t('turnStatusMove') + getCountryName(p.id);
+                }
+            } else {
+                initSetup(false);
+            }
+        }
+
+        function showLanguageSavedHint() {
+            const hint = document.getElementById('language-saved-hint');
+            if (!hint) return;
+            hint.classList.remove('hidden');
+            hint.classList.add('opacity-100');
+            setTimeout(() => {
+                hint.classList.add('hidden');
+            }, 1400);
+        }
+
+        function getSeasonInfo() {
+            const month = new Date().getMonth();
+            if (month === 11 || month === 0 || month === 1) { // Dec, Jan, Feb - Winter
+                return { name: 'winter', emoji: '❄️', particles: ['❄️', '🌨️', '❅', '❆'] };
+            } else if (month >= 2 && month <= 4) { // Mar, Apr, May - Spring
+                return { name: 'spring', emoji: '🌸', particles: ['🍃', '🌸', '🌼', '🌿', '🦋', '🐝'] };
+            } else if (month >= 5 && month <= 7) { // Jun, Jul, Aug - Summer
+                return { name: 'summer', emoji: '🌞', particles: ['🌾', '🍄', '🫐', '🍓', '🌻', '🦗'] };
+            } else { // Sep, Oct, Nov - Autumn
+                return { name: 'autumn', emoji: '🍂', particles: ['🍂', '🍎', '🎃', '🌰', '🦃', '🍁'] };
+            }
+        }
+
+        function updateToggleButtons() {
+            // Snow (now shows seasons)
+            const snowBtn = document.getElementById('btn-snow');
+            const snowTxt = document.getElementById('txt-snow');
+            const emojiSpan = document.getElementById('emoji-snow');
+            const season = getSeasonInfo();
+            
+            if(isSnowing) {
+                snowBtn.classList.add('bg-blue-900', 'border-blue-500');
+                snowTxt.innerText = TRANSLATIONS[currentLang].settings[season.name + 'On'];
+                emojiSpan.innerText = season.emoji;
+            } else {
+                snowBtn.classList.remove('bg-blue-900', 'border-blue-500');
+                snowTxt.innerText = TRANSLATIONS[currentLang].settings[season.name];
+                emojiSpan.innerText = season.emoji;
+            }
+            // Anim
+            const animBtn = document.getElementById('btn-anim');
+            const animTxt = document.getElementById('txt-anim');
+            if(enableAnimations) {
+                animBtn.classList.add('bg-blue-900', 'border-blue-500');
+                animTxt.innerText = TRANSLATIONS[currentLang].settings.animOn;
+            } else {
+                animBtn.classList.remove('bg-blue-900', 'border-blue-500');
+                animTxt.innerText = TRANSLATIONS[currentLang].settings.animOff;
+            }
+            // Glass
+            const glassBtn = document.getElementById('btn-glass');
+            const glassTxt = document.getElementById('txt-glass');
+            if(isGlass) {
+                glassBtn.classList.add('bg-blue-900', 'border-blue-500');
+                glassTxt.innerText = TRANSLATIONS[currentLang].settings.glassOn;
+            } else {
+                glassBtn.classList.remove('bg-blue-900', 'border-blue-500');
+                glassTxt.innerText = TRANSLATIONS[currentLang].settings.glass;
+            }
+        }
+
+        function toggleLiquidGlass() {
+            isGlass = !isGlass;
+            if (isGlass) document.body.classList.add('glass-mode');
+            else document.body.classList.remove('glass-mode');
+            updateToggleButtons();
+        }
+
+        function toggleSnow() {
+            isSnowing = !isSnowing;
+            const headerEmoji = document.getElementById('header-emoji');
+            const season = getSeasonInfo();
+            if (isSnowing) {
+                headerEmoji.src = SNOW_ICON_SRC;
+                headerEmoji.alt = 'Snow';
+                startSnow();
+            } else {
+                headerEmoji.src = GLOBE_ICON_SRC;
+                headerEmoji.alt = 'Globe';
+                stopSnow();
+            }
+            updateToggleButtons();
+        }
+
+        function toggleAnimations() {
+            enableAnimations = !enableAnimations;
+            updateToggleButtons();
+        }
+
+        function startSnow() {
+            if (snowInterval) clearInterval(snowInterval);
+            for(let i=0; i<10; i++) createSnowflake();
+            snowInterval = setInterval(createSnowflake, 300);
+        }
+
+        function stopSnow() {
+            if (snowInterval) clearInterval(snowInterval);
+            document.querySelectorAll('.snowflake').forEach(el => el.remove());
+        }
+
+        function createSnowflake() {
+            const flake = document.createElement('div');
+            flake.classList.add('snowflake');
+            const season = getSeasonInfo();
+            const isText = Math.random() < 0.05;
+            
+            if (isText) {
+                let textContent;
+                if (season.name === 'winter') {
+                    textContent = currentLang === 'ru' ? 'С Новым Годом!' : 'Happy New Year!';
+                } else if (season.name === 'spring') {
+                    const springTexts = currentLang === 'ru' ? ['Весна!', 'Тепло!', 'Расцвет!'] : ['Spring!', 'Warm!', 'Bloom!'];
+                    textContent = springTexts[Math.floor(Math.random() * springTexts.length)];
+                } else if (season.name === 'summer') {
+                    const summerTexts = currentLang === 'ru' ? ['Лето!', 'Солнце!', 'Тепло!'] : ['Summer!', 'Sun!', 'Hot!'];
+                    textContent = summerTexts[Math.floor(Math.random() * summerTexts.length)];
+                } else {
+                    const autumnTexts = currentLang === 'ru' ? ['Осень!', 'Урожай!', 'Холод!'] : ['Autumn!', 'Harvest!', 'Cold!'];
+                    textContent = autumnTexts[Math.floor(Math.random() * autumnTexts.length)];
+                }
+                flake.innerText = textContent;
+                flake.classList.add('text-flake');
+                flake.style.color = '#fbbf24';
+                flake.style.fontSize = (Math.random() * 0.5 + 1) + 'rem';
+            } else {
+                flake.innerText = season.particles[Math.floor(Math.random() * season.particles.length)];
+                flake.style.color = 'rgba(255, 255, 255, ' + (Math.random() * 0.5 + 0.3) + ')';
+                flake.style.fontSize = (Math.random() * 0.8 + 0.5) + 'rem';
+            }
+            const startLeft = Math.random() * 95;
+            const duration = Math.random() * 3 + 4;
+            flake.style.left = startLeft + 'vw';
+            flake.style.animationDuration = duration + 's';
+            document.body.appendChild(flake);
+            setTimeout(() => { if (flake && flake.parentNode) flake.remove(); }, duration * 1000);
+        }
+
+        // --- Data ---
+        let currentRegion = 'global';
+        const LORE_GROUPS = [
+            { ids: ['nkorea', 'china', 'russia', 'belarus'], name: {ru: 'Красный Альянс', en: 'Red Alliance'} },
+            { ids: ['canada', 'australia', 'uk'], name: {ru: 'Содружество', en: 'Commonwealth'} },
+            { ids: ['canada', 'uk'], name: {ru: 'Содружество', en: 'Commonwealth'} }, // For NATO context
+            { ids: ['israel', 'usa'], name: {ru: 'Стратегический Альянс', en: 'Strategic Alliance'} },
+            { ids: ['poland', 'czechia', 'slovakia', 'hungary'], name: {ru: 'Вышеградская 4', en: 'Visegrad Group'} },
+            { ids: ['belgium', 'netherlands', 'luxembourg'], name: {ru: 'Бенилюкс', en: 'Benelux'} },
+            { ids: ['belgium', 'netherlands'], name: {ru: 'Бенилюкс', en: 'Benelux'} }, // For NATO context
+            { ids: ['sweden', 'finland', 'denmark', 'norway'], name: {ru: 'Скандинавия', en: 'Nordics'} },
+            { ids: ['estonia', 'latvia', 'lithuania'], name: {ru: 'Балтия', en: 'Baltics'} },
+            // New Groups for NATO
+            { ids: ['spain', 'portugal'], name: {ru: 'Иберия', en: 'Iberia'} },
+            { ids: ['tuerkey', 'greec'], name: {ru: 'Эгейский Союз', en: 'Aegean Alliance'} },
+            // EU additions
+            { ids: ['germany', 'austria'], name: {ru: 'Германское ядро', en: 'Germanic Core'} },
+            { ids: ['france', 'poland'], name: {ru: 'Стратегические партнеры', en: 'Strategic Partners'} },
+            { ids: ['czechia', 'germany'], name: {ru: 'Приграничье', en: 'Cross-Border'} }
+        ];
+
+        const CONFIG_GLOBAL = [
+            { id: 'china', name: {ru: 'Китай', en: 'China'}, flag: '🇨🇳', diff: 'EASY', diffColor: 'text-green-400', hp: 12, nukes: 2, loreAllies: ['russia', 'nkorea'] },
+            { id: 'usa', name: {ru: 'США', en: 'USA'}, flag: '🇺🇸', diff: 'EASY', diffColor: 'text-green-400', hp: 12, nukes: 2, loreAllies: ['israel'] },
+            { id: 'poland', name: {ru: 'Польша', en: 'Poland'}, flag: '🇵🇱', diff: 'HARD', diffColor: 'text-red-500', hp: 9 },
+            { id: 'skorea', name: {ru: 'Юж. Корея', en: 'S. Korea'}, flag: '🇰🇷', diff: 'EASY', diffColor: 'text-green-400', hp: 11 },
+            { id: 'ukraine', name: {ru: 'Украина', en: 'Ukraine'}, flag: '🇺🇦', diff: 'MEDIUM', diffColor: 'text-yellow-400', hp: 10 },
+            { id: 'russia', name: {ru: 'Россия', en: 'Russia'}, flag: '🇷🇺', diff: 'VERY_EASY', diffColor: 'text-green-200', hp: 12, nukes: 2, loreAllies: ['china', 'nkorea'] },
+            { id: 'japan', name: {ru: 'Япония', en: 'Japan'}, flag: '🇯🇵', diff: 'MEDIUM', diffColor: 'text-yellow-400', hp: 11, isPacifist: true },
+            { id: 'brazil', name: {ru: 'Бразилия', en: 'Brazil'}, flag: '🇧🇷', diff: 'MEDIUM', diffColor: 'text-yellow-400', hp: 10 },
+            { id: 'canada', name: {ru: 'Канада', en: 'Canada'}, flag: '🇨🇦', diff: 'EASY', diffColor: 'text-green-400', extended: true, hp: 11, loreAllies: ['uk', 'australia'] },
+            { id: 'australia', name: {ru: 'Австралия', en: 'Australia'}, flag: '🇦🇺', diff: 'EASY', diffColor: 'text-green-400', extended: true, hp: 11, loreAllies: ['uk', 'canada'] },
+            { id: 'israel', name: {ru: 'Израиль', en: 'Israel'}, flag: '🇮🇱', diff: 'MEDIUM', diffColor: 'text-yellow-400', extended: true, hp: 10, nukes: 1, loreAllies: ['usa'] },
+            { id: 'india', name: {ru: 'Индия', en: 'India'}, flag: '🇮🇳', diff: 'EASY', diffColor: 'text-green-400', extended: true, hp: 11, nukes: 1 },
+            { id: 'switzerland', name: {ru: 'Швейцария', en: 'Switzerland'}, flag: '🇨🇭', diff: 'LUCK', diffColor: 'text-purple-400', extended: true, hp: 18, isPacifist: true },
+            { id: 'uk', name: {ru: 'Великобритания', en: 'UK'}, flag: '🇬🇧', diff: 'EASY', diffColor: 'text-green-400', extended: true, hp: 12, nukes: 2, loreAllies: ['canada', 'australia'] },
+            { id: 'nkorea', name: {ru: 'КНДР', en: 'N. Korea'}, flag: '🇰🇵', diff: 'VERY_EASY', diffColor: 'text-green-200', extended: true, hp: 10, nukes: 2, loreAllies: ['china', 'russia'] }
+        ];
+
+        const CONFIG_EAST_EU = [
+            { id: 'czechia', name: {ru: 'Чехия', en: 'Czechia'}, flag: '🇨🇿', diff: 'HARD', diffColor: 'text-red-500', hp: 9, loreAllies: ['slovakia'] },
+            { id: 'poland', name: {ru: 'Польша', en: 'Poland'}, flag: '🇵🇱', diff: 'HARD', diffColor: 'text-red-500', hp: 9, loreAllies: ['ukraine'] },
+            { id: 'russia', name: {ru: 'Россия', en: 'Russia'}, flag: '🇷🇺', diff: 'VERY_EASY', diffColor: 'text-green-200', hp: 12, nukes: 2, loreAllies: ['belarus', 'serbia'] },
+            { id: 'lithuania', name: {ru: 'Литва', en: 'Lithuania'}, flag: '🇱🇹', diff: 'EASY', diffColor: 'text-green-400', extended: true, hp: 10, loreAllies: ['latvia', 'estonia'] },
+            { id: 'latvia', name: {ru: 'Латвия', en: 'Latvia'}, flag: '🇱🇻', diff: 'EASY', diffColor: 'text-green-400', extended: true, hp: 10, loreAllies: ['lithuania', 'estonia'] },
+            { id: 'estonia', name: {ru: 'Эстония', en: 'Estonia'}, flag: '🇪🇪', diff: 'EASY', diffColor: 'text-green-400', extended: true, hp: 10, loreAllies: ['latvia', 'lithuania'] },
+            { id: 'belarus', name: {ru: 'Беларусь', en: 'Belarus'}, flag: '🇧🇾', diff: 'EASY', diffColor: 'text-green-400', hp: 10, loreAllies: ['russia'] },
+            { id: 'ukraine', name: {ru: 'Украина', en: 'Ukraine'}, flag: '🇺🇦', diff: 'EASY', diffColor: 'text-green-400', hp: 10, loreAllies: ['poland'] },
+            { id: 'moldova', name: {ru: 'Молдова', en: 'Moldova'}, flag: '🇲🇩', diff: 'HARD', diffColor: 'text-red-500', extended: true, hp: 9, loreAllies: ['romania'] },
+            { id: 'hungary', name: {ru: 'Венгрия', en: 'Hungary'}, flag: '🇭🇺', diff: 'HARD', diffColor: 'text-red-500', hp: 8, nukes: 1 },
+            { id: 'slovakia', name: {ru: 'Словакия', en: 'Slovakia'}, flag: '🇸🇰', diff: 'VERY_HARD', diffColor: 'text-purple-600', extended: true, hp: 8, loreAllies: ['czechia'] },
+            { id: 'romania', name: {ru: 'Румыния', en: 'Romania'}, flag: '🇷🇴', diff: 'HARD', diffColor: 'text-red-500', hp: 9, loreAllies: ['moldova'] },
+            { id: 'bulgaria', name: {ru: 'Болгария', en: 'Bulgaria'}, flag: '🇧🇬', diff: 'EASY', diffColor: 'text-green-400', extended: true, hp: 10 },
+            { id: 'serbia', name: {ru: 'Сербия', en: 'Serbia'}, flag: '🇷🇸', diff: 'EASY', diffColor: 'text-green-400', hp: 10, loreAllies: ['russia'] },
+            { id: 'kosovo', name: {ru: 'Косово', en: 'Kosovo'}, flag: '🇽🇰', diff: 'VERY_HARD', diffColor: 'text-purple-600', extended: true, hp: 8 }
+        ];
+
+        const CONFIG_NATO = [
+            { id: 'usa', name: {ru: 'США', en: 'USA'}, flag: '🇺🇸', diff: 'VERY_EASY', diffColor: 'text-green-200', hp: 12, nukes: 2 },
+            { id: 'uk', name: {ru: 'Великобритания', en: 'UK'}, flag: '🇬🇧', diff: 'EASY', diffColor: 'text-green-400', hp: 11, nukes: 1, loreAllies: ['canada'] },
+            { id: 'france', name: {ru: 'Франция', en: 'France'}, flag: '🇫🇷', diff: 'EASY', diffColor: 'text-green-400', hp: 11, nukes: 1 },
+            { id: 'germany', name: {ru: 'Германия', en: 'Germany'}, flag: '🇩🇪', diff: 'EASY', diffColor: 'text-green-400', hp: 12 },
+            { id: 'turkey', name: {ru: 'Турция', en: 'Turkey'}, flag: '🇹🇷', diff: 'MEDIUM', diffColor: 'text-yellow-400', hp: 10, loreAllies: ['greece'] },
+            { id: 'italy', name: {ru: 'Италия', en: 'Italy'}, flag: '🇮🇹', diff: 'MEDIUM', diffColor: 'text-yellow-400', hp: 10 },
+            { id: 'poland', name: {ru: 'Польша', en: 'Poland'}, flag: '🇵🇱', diff: 'VERY_HARD', diffColor: 'text-purple-600', hp: 9 },
+            { id: 'canada', name: {ru: 'Канада', en: 'Canada'}, flag: '🇨🇦', diff: 'EASY', diffColor: 'text-green-400', hp: 11, loreAllies: ['uk'] },
+            { id: 'spain', name: {ru: 'Испания', en: 'Spain'}, flag: '🇪🇸', diff: 'EASY', diffColor: 'text-green-400', extended: true, hp: 10, loreAllies: ['portugal'] },
+            { id: 'greece', name: {ru: 'Греция', en: 'Greece'}, flag: '🇬🇷', diff: 'MEDIUM', diffColor: 'text-yellow-400', extended: true, hp: 10, loreAllies: ['turkey'] },
+            { id: 'norway', name: {ru: 'Норвегия', en: 'Norway'}, flag: '🇳🇴', diff: 'MEDIUM', diffColor: 'text-yellow-400', extended: true, hp: 10 },
+            { id: 'netherlands', name: {ru: 'Нидерланды', en: 'Netherlands'}, flag: '🇳🇱', diff: 'MEDIUM', diffColor: 'text-yellow-400', extended: true, hp: 10, loreAllies: ['belgium'] },
+            { id: 'belgium', name: {ru: 'Бельгия', en: 'Belgium'}, flag: '🇧🇪', diff: 'MEDIUM', diffColor: 'text-yellow-400', extended: true, hp: 10, loreAllies: ['netherlands'] },
+            { id: 'romania', name: {ru: 'Румыния', en: 'Romania'}, flag: '🇷🇴', diff: 'HARD', diffColor: 'text-red-500', extended: true, hp: 9 },
+            { id: 'portugal', name: {ru: 'Португалия', en: 'Portugal'}, flag: '🇵🇹', diff: 'MEDIUM', diffColor: 'text-yellow-400', extended: true, hp: 10, loreAllies: ['spain'] }
+        ];
+
+        const CONFIG_EU = [
+            { id: 'germany', name: {ru: 'Германия', en: 'Germany'}, flag: '🇩🇪', diff: 'VERY_EASY', diffColor: 'text-green-200', hp: 12, loreAllies: ['austria', 'czechia'] },
+            { id: 'france', name: {ru: 'Франция', en: 'France'}, flag: '🇫🇷', diff: 'VERY_EASY', diffColor: 'text-green-200', hp: 11, nukes: 1, loreAllies: ['poland'] },
+            { id: 'italy', name: {ru: 'Италия', en: 'Italy'}, flag: '🇮🇹', diff: 'EASY', diffColor: 'text-green-400', hp: 10 },
+            { id: 'spain', name: {ru: 'Испания', en: 'Spain'}, flag: '🇪🇸', diff: 'EASY', diffColor: 'text-green-400', hp: 10 },
+            { id: 'poland', name: {ru: 'Польша', en: 'Poland'}, flag: '🇵🇱', diff: 'HARD', diffColor: 'text-red-500', hp: 9, loreAllies: ['france'] },
+            { id: 'sweden', name: {ru: 'Швеция', en: 'Sweden'}, flag: '🇸🇪', diff: 'EASY', diffColor: 'text-green-400', hp: 10, loreAllies: ['finland'] },
+            { id: 'netherlands', name: {ru: 'Нидерланды', en: 'Netherlands'}, flag: '🇳🇱', diff: 'MEDIUM', diffColor: 'text-yellow-400', hp: 10, loreAllies: ['belgium'] },
+            { id: 'belgium', name: {ru: 'Бельгия', en: 'Belgium'}, flag: '🇧🇪', diff: 'MEDIUM', diffColor: 'text-yellow-400', hp: 10, loreAllies: ['netherlands'] },
+            { id: 'austria', name: {ru: 'Австрия', en: 'Austria'}, flag: '🇦🇹', diff: 'MEDIUM', diffColor: 'text-yellow-400', extended: true, hp: 10, loreAllies: ['germany'] },
+            { id: 'greece', name: {ru: 'Греция', en: 'Greece'}, flag: '🇬🇷', diff: 'MEDIUM', diffColor: 'text-yellow-400', extended: true, hp: 10 },
+            { id: 'portugal', name: {ru: 'Португалия', en: 'Portugal'}, flag: '🇵🇹', diff: 'MEDIUM', diffColor: 'text-yellow-400', extended: true, hp: 10 },
+            { id: 'finland', name: {ru: 'Финляндия', en: 'Finland'}, flag: '🇫🇮', diff: 'EASY', diffColor: 'text-green-400', extended: true, hp: 10, loreAllies: ['sweden'] },
+            { id: 'denmark', name: {ru: 'Дания', en: 'Denmark'}, flag: '🇩🇰', diff: 'MEDIUM', diffColor: 'text-yellow-400', extended: true, hp: 10, loreAllies: ['finland', 'sweden'] },
+            { id: 'ireland', name: {ru: 'Ирландия', en: 'Ireland'}, flag: '🇮🇪', diff: 'MEDIUM', diffColor: 'text-yellow-400', extended: true, hp: 10 },
+            { id: 'czechia', name: {ru: 'Чехия', en: 'Czechia'}, flag: '🇨🇿', diff: 'HARD', diffColor: 'text-red-500', extended: true, hp: 9, loreAllies: ['germany'] }
+        ];
+
+        let COUNTRIES_CONFIG = CONFIG_GLOBAL;
+
+        function toggleLore() {
+            const modal = document.getElementById('lore-modal');
+            const isHidden = modal.classList.contains('hidden');
+            if (isHidden) {
+                renderLoreList();
+                modal.classList.remove('hidden');
+                setTimeout(() => modal.children[0].classList.remove('scale-90', 'opacity-0'), 10);
+            } else {
+                modal.children[0].classList.add('scale-90', 'opacity-0');
+                setTimeout(() => modal.classList.add('hidden'), 300);
+            }
+        }
+
+        function renderLoreList() {
+            const list = document.getElementById('lore-list');
+            list.innerHTML = '';
+            
+            // Get current active config
+            const activeIds = COUNTRIES_CONFIG.map(c => c.id);
+            const isExtended = document.getElementById('extended-mode-check')?.checked;
+            
+            // Filter groups that have at least 2 members present in current config
+            // And respect extended mode
+            const activeGroups = LORE_GROUPS.filter(g => {
+                const presentMembers = g.ids.filter(id => {
+                    const country = COUNTRIES_CONFIG.find(c => c.id === id);
+                    if (!country) return false;
+                    return !country.extended || isExtended;
+                });
+                return presentMembers.length >= 2;
+            });
+
+            if (activeGroups.length === 0) {
+                list.innerHTML = `<div class="text-gray-400 text-center py-4">${currentLang === 'ru' ? 'Нет активных альянсов' : 'No active alliances'}</div>`;
+                return;
+            }
+
+            // Remove duplicates (some groups might be defined multiple times for different contexts, pick unique by name+ids)
+            const uniqueGroups = [];
+            const seen = new Set();
+            activeGroups.forEach(g => {
+                const key = g.ids.sort().join('|');
+                if(!seen.has(key)) {
+                    seen.add(key);
+                    uniqueGroups.push(g);
+                }
+            });
+
+            uniqueGroups.forEach(g => {
+                const item = document.createElement('div');
+                item.className = "bg-gray-900/50 p-3 rounded-xl border border-gray-700/50 flex items-center justify-between";
+                
+                const presentMembers = g.ids
+                    .filter(id => {
+                        const country = COUNTRIES_CONFIG.find(c => c.id === id);
+                        return country && (!country.extended || isExtended);
+                    })
+                    .map(id => {
+                         const country = COUNTRIES_CONFIG.find(c => c.id === id);
+                         return `<span class="text-2xl" title="${getLoc(country.name)}">${country.flag}</span>`;
+                    }).join(' ');
+
+                item.innerHTML = `
+                    <div class="font-bold text-gray-200">${getLoc(g.name)}</div>
+                    <div class="flex gap-2 bg-gray-800 p-1.5 rounded-lg border border-gray-700">${presentMembers}</div>
+                `;
+                list.appendChild(item);
+            });
+            
+            document.getElementById('lore-title').innerText = currentLang === 'ru' ? 'Лоровые Альянсы' : 'Lore Alliances';
+            document.getElementById('lore-footer').innerText = currentLang === 'ru' ? 'Альянсы формируются автоматически в начале игры.' : 'Alliances are automatically formed at start.';
+        }
+
+        function selectLanguageAndStart(lang) {
+            languageChosen = true;
+            localStorage.setItem('fallofflags_language', lang);
+            setLanguage(lang);
+            
+            const container = document.getElementById('language-selection');
+            const btnRu = container.querySelector("button[onclick*='ru']");
+            const btnEn = container.querySelector("button[onclick*='en']");
+            
+            // Highlight selected
+            if (lang === 'ru') {
+                btnRu.classList.add('ring-4', 'ring-blue-500', 'scale-110', 'bg-blue-900/50', 'z-10');
+                btnEn.classList.add('opacity-40', 'scale-90', 'blur-sm');
+            } else {
+                btnEn.classList.add('ring-4', 'ring-blue-500', 'scale-110', 'bg-blue-900/50', 'z-10');
+                btnRu.classList.add('opacity-40', 'scale-90', 'blur-sm');
+            }
+            
+            // Slide down animation
+            setTimeout(() => {
+                container.classList.add('translate-y-full', 'opacity-0');
+            }, 300);
+
+            // Hide and show setup
+            setTimeout(() => {
+                container.classList.add('hidden');
+                document.getElementById('setup-screen').classList.remove('hidden');
+                initSetup();
+            }, 800);
+        }
+
+        function getLoc(obj) { return obj[currentLang] || obj['ru']; }
+        function getCountryName(id) { const p = COUNTRIES_CONFIG.find(c => c.id === id); return p ? `${p.flag} ${getLoc(p.name)}` : id; }
+
+        const SWISS_WEAPONS = ['cannon', 'grenade'];
+        const OFFENSIVE_WEAPONS = {
+            cannon: { name: {ru: 'Ядро', en: 'Cannon'}, damage: 1, type: 'attack', desc: {ru: '1 урон', en: '1 damage'} },
+            potion: { name: {ru: 'Зелье', en: 'Potion'}, damage: 1, type: 'dot', desc: {ru: '1 урон за 2 хода', en: '1 dmg/turn x2'} },
+            grenade: { name: {ru: 'Граната', en: 'Grenade'}, damage: 2, type: 'attack', desc: {ru: '2 урона', en: '2 damage'} },
+            rocket: { name: {ru: 'Ракета', en: 'Rocket'}, damage: 2, type: 'pierce', desc: {ru: '2 урона, пробивает щит', en: '2 dmg, pierces'} },
+            plane: { name: {ru: 'Самолет', en: 'Plane'}, damage: 2, type: 'attack', desc: {ru: '2 урона', en: '2 damage'} },
+            explosive: { name: {ru: 'Взрывчатка', en: 'Explosive'}, damage: 2, type: 'attack', desc: {ru: '2 урона', en: '2 damage'} },
+            drone: { name: {ru: 'Дрон', en: 'Drone'}, damage: 1, type: 'attack', desc: {ru: '1 урон', en: '1 damage'} }
+        };
+        const SPECIAL_WEAPONS = {
+            nuke: { name: {ru: 'Ядерное оружие', en: 'Nuclear Weapon'}, damage: 5, type: 'nuke', cd: 5, desc: {ru: '5 урона (перезарядка 5 ходов)', en: '5 damage (5 turn cooldown)'} }
+        };
+        const FRIENDLY_ACTIONS = {
+            heart: { name: {ru: 'Сердце', en: 'Heart'}, type: 'heal', cost: 1, desc: {ru: 'Отдать 1 ❤️, дать щит и СОЮЗ', en: 'Give 1 ❤️, grant shield & ALLIANCE'} },
+            revive: { name: {ru: 'Возрождение', en: 'Revive'}, type: 'revive', cost: 2, desc: {ru: 'Отдать 2 ❤️ для воскрешения', en: 'Give 2 ❤️ to revive'} }
+        };
+
+        // --- Game State ---
+        let gameState = { moveCount: 0, roundCount: 0, mode: 'relay', turnQueue: [], activePlayerId: null, players: [], userPlayerId: null, secondPlayerId: null, setupSelection: [], userCurrentWeapon: null, isGameOver: false, logs: [], activeEffects: {}, lastSelectedTarget: null, heartsLog: {}, pendingAllianceOffer: null, lastEnemyAttacked: null, playerStats: { wins: 0, losses: 0, totalGames: 0 } };
+        let selectedAction = null;
+
+        let pendingAllianceResolve = null;
+
+        function respondAlliance(accepted) {
+            const modal = document.getElementById('alliance-offer-modal');
+            modal.classList.add('hidden');
+            if (pendingAllianceResolve) {
+                pendingAllianceResolve(accepted);
+                pendingAllianceResolve = null;
+            }
+        }
+
+/**
+ * Switches the game region and updates the available countries accordingly.
+ * If the new region requires more wins than the current player has, an alert is shown and the function returns without changing the region.
+ * @param {string} regionKey - The key of the new region (global, east, nato, eu).
+ */
+        function setRegion(regionKey) {
+            if (gameState.activePlayerId && !gameState.isGameOver) {
+                showNotification(currentLang === 'ru' ? 'Нельзя менять регион во время игры.' : 'Cannot change region during an active game.');
+                return;
+            }
+            const requiredWins = getRegionRequiredWins(regionKey);
+            if (requiredWins > 0 && gameState.playerStats.wins < requiredWins) {
+                showNotification(`Требуется ${requiredWins} побед для этого региона. Сейчас: ${gameState.playerStats.wins}`);
+                return;
+            }
+            
+            currentRegion = regionKey;
+            if (currentRegion === 'global') COUNTRIES_CONFIG = CONFIG_GLOBAL;
+            else if (currentRegion === 'east') COUNTRIES_CONFIG = CONFIG_EAST_EU;
+            else if (currentRegion === 'nato') COUNTRIES_CONFIG = CONFIG_NATO;
+            else if (currentRegion === 'eu') COUNTRIES_CONFIG = CONFIG_EU;
+            updateRegionLabel();
+            gameState.setupSelection = [];
+            document.getElementById('start-btn').disabled = true;
+            initSetup();
+            if(!document.getElementById('lore-modal').classList.contains('hidden')) renderLoreList();
+            
+            const btn = document.getElementById('region-btn');
+            if(btn) {
+                btn.classList.add('ring-2', 'ring-blue-400');
+                setTimeout(() => btn.classList.remove('ring-2', 'ring-blue-400'), 200);
+            }
+        }
+
+        function getRegionRequiredWins(region) {
+            const regionIndex = { global: 0, east: 1, nato: 2, eu: 3 };
+            const index = regionIndex[region] || 0;
+            return index * 10;
+        }
+
+        function updateRegionLabel() {
+            const btnLabel = document.getElementById('current-region-name');
+            const mapBtn = document.getElementById('btn-map');
+            const map = { global: { icon: '🏰', text: t('regions').global }, east: { icon: '🛡️', text: t('regions').east }, nato: { icon: '🌍', text: t('regions').nato }, eu: { icon: '🇪🇺', text: t('regions').eu } };
+            const info = map[currentRegion];
+            if (btnLabel) btnLabel.innerHTML = `${info.icon} ${info.text}`;
+            if (mapBtn) mapBtn.innerText = info.icon;
+        }
+
+        function toggleRegion() {
+            if (currentRegion === 'global') setRegion('east');
+            else if (currentRegion === 'east') setRegion('nato');
+            else if (currentRegion === 'nato') setRegion('eu');
+            else setRegion('global');
+        }
+
+        function animateAttack(fromId, toId, type, callback) {
+            if (!enableAnimations || !fromId || !toId) { if (callback) callback(); return; }
+            const fromEl = document.getElementById(`card-${fromId}`);
+            const toEl = document.getElementById(`card-${toId}`);
+            if (!fromEl || !toEl) { if (callback) callback(); return; }
+            const rect1 = fromEl.getBoundingClientRect();
+            const rect2 = toEl.getBoundingClientRect();
+            const projectile = document.createElement('div');
+            projectile.className = 'projectile';
+            let emoji = '⚔️';
+            if (type === 'nuke') emoji = '☢️'; else if (type === 'potion') emoji = '🧪'; else if (type === 'heart') emoji = '❤️'; else if (type === 'revive') emoji = '✨'; else if (OFFENSIVE_WEAPONS[type]) { if (type.includes('rocket')) emoji = '🚀'; else if (type.includes('plane')) emoji = '✈️'; else if (type.includes('grenade')) emoji = '💣'; else if (type.includes('cannon')) emoji = '💣'; else if (type.includes('drone')) emoji = '🛸'; }
+            projectile.innerText = emoji;
+            const startX = rect1.left + rect1.width / 2;
+            const startY = rect1.top + rect1.height / 2;
+            projectile.style.left = `${startX}px`; projectile.style.top = `${startY}px`; projectile.style.marginLeft = '-1rem'; projectile.style.marginTop = '-1rem';
+            document.body.appendChild(projectile);
+            void projectile.offsetWidth;
+            const endX = rect2.left + rect2.width / 2;
+            const endY = rect2.top + rect2.height / 2;
+            projectile.style.transform = `translate(${endX - startX}px, ${endY - startY}px)`;
+            setTimeout(() => { projectile.remove(); if (callback) callback(); }, 800);
+        }
+
+        function updateExtendedModeAvailability() {
+            const extCheck = document.getElementById('extended-mode-check');
+            const extLabel = document.getElementById('label-extended-mode');
+            const wins = gameState.playerStats.wins || 0;
+            const unlocked = wins >= 5;
+            if (!extCheck || !extLabel) return;
+
+            if (unlocked) {
+                extCheck.disabled = false;
+                extLabel.classList.remove('opacity-50', 'cursor-not-allowed');
+                extLabel.classList.add('cursor-pointer');
+                extLabel.title = '';
+            } else {
+                extCheck.disabled = true;
+                extCheck.checked = false;
+                extLabel.classList.add('opacity-50', 'cursor-not-allowed');
+                extLabel.classList.remove('cursor-pointer');
+                extLabel.title = `Требуется 5 побед (сейчас ${wins})`;
+            }
+        }
+
+        function toggleExtendedMode() {
+            const extCheck = document.getElementById('extended-mode-check');
+            if (!extCheck) return;
+            if (gameState.playerStats.wins < 5) {
+                extCheck.checked = false;
+                showNotification('Нужны 5 побед, чтобы включить расширенный режим.');
+                return;
+            }
+
+            const isExtended = extCheck.checked;
+            const duelCheck = document.getElementById('duel-mode-check');
+            const duelLabel = document.getElementById('duel-mode-label');
+            if (isExtended) {
+                duelCheck.disabled = false;
+                duelLabel.classList.remove('opacity-50', 'cursor-not-allowed');
+                duelLabel.classList.add('cursor-pointer', 'hover:bg-gray-700');
+            } else {
+                duelCheck.disabled = true;
+                duelLabel.classList.add('opacity-50', 'cursor-not-allowed');
+                duelLabel.classList.remove('cursor-pointer', 'hover:bg-gray-700');
+                if (duelCheck.checked) { duelCheck.checked = false; toggleDuelMode(); }
+                gameState.setupSelection = gameState.setupSelection.filter(id => { const c = COUNTRIES_CONFIG.find(x => x.id === id); return c && !c.extended; });
+            }
+            initSetup();
+            if(!document.getElementById('lore-modal').classList.contains('hidden')) renderLoreList();
+        }
+
+        function toggleDuelMode() {
+            gameState.setupSelection = [];
+            initSetup(false);
+            document.getElementById('start-btn').disabled = true;
+        }
+
+        function initSetup(animate = true) {
+            const container = document.getElementById('country-selection');
+            container.innerHTML = '';
+            const isExtended = document.getElementById('extended-mode-check')?.checked;
+            const isDuel = document.getElementById('duel-mode-check')?.checked;
+            let visibleIndex = 0;
+            COUNTRIES_CONFIG.forEach((c) => {
+                if (c.extended && !isExtended) return;
+                const btn = document.createElement('button');
+                const isSelected = gameState.setupSelection.includes(c.id);
+                let btnClass = `p-3 rounded border border-gray-600 hover:bg-gray-600 transition flex flex-col items-center gap-1 relative overflow-hidden w-full h-full justify-between `;
+                if (animate) btnClass += 'anim-appear ';
+                if (isSelected) btnClass += 'bg-gray-600 ring-2 ring-blue-500 scale-105 shadow-lg shadow-blue-500/30 z-10 selected-card'; else btnClass += 'bg-gray-700 hover:scale-105';
+                btn.className = btnClass;
+                btn.style.animationDelay = `${visibleIndex * 0.05}s`;
+                visibleIndex++;
+                let loreHtml = '';
+                if (isExtended && c.loreAllies && c.loreAllies.length > 0) {
+                     const activeAllies = c.loreAllies.filter(aid => { const ac = COUNTRIES_CONFIG.find(x => x.id === aid); return ac && (!ac.extended || isExtended); });
+                    if (activeAllies.length > 0) {
+                        const activeFlags = activeAllies.map(aid => { const ac = COUNTRIES_CONFIG.find(x => x.id === aid); return ac ? ac.flag : ''; }).join(' ');
+                        loreHtml = `<div class="mt-1 text-[10px] text-indigo-300 bg-indigo-900/50 px-1 rounded w-full" title="Lore Ally">🤝 ${activeFlags}</div>`;
+                    }
+                }
+                let badge = '';
+                if (isDuel && isSelected) {
+                    const idx = gameState.setupSelection.indexOf(c.id);
+                    badge = `<span class="absolute top-0 left-0 bg-blue-600 text-white text-[10px] px-1 font-bold">${idx === 0 ? t('p1') : t('p2')}</span>`;
+                }
+                btn.innerHTML = `<div class="absolute top-0 right-0 p-1 text-[10px] font-bold ${c.diffColor}">${t('difficulty')[c.diff]}</div>${badge}<span class="text-2xl mt-2">${c.flag}</span><span class="text-sm font-bold leading-tight">${getLoc(c.name)}</span><span class="text-xs text-gray-400">${t('hp')}: ${c.hp}</span>${loreHtml}`;
+                btn.onclick = () => selectCountry(c.id, btn);
+                container.appendChild(btn);
+            });
+            const count = gameState.setupSelection.length;
+            const required = isDuel ? 2 : 1;
+            document.getElementById('start-btn').disabled = count < required;
+        }
+
+        function selectCountry(id, btnElement) {
+            const isDuel = document.getElementById('duel-mode-check')?.checked;
+            if (isDuel) {
+                if (gameState.setupSelection.includes(id)) gameState.setupSelection = gameState.setupSelection.filter(x => x !== id);
+                else { if (gameState.setupSelection.length < 2) gameState.setupSelection.push(id); else return; }
+            } else gameState.setupSelection = [id];
+            initSetup(false);
+        }
+
+        function rollUserWeapon() {
+            let pool = Object.keys(OFFENSIVE_WEAPONS);
+            if (gameState.activePlayerId === 'switzerland') pool = SWISS_WEAPONS;
+            const randomKey = pool[Math.floor(Math.random() * pool.length)];
+            gameState.userCurrentWeapon = randomKey;
+        }
+
+        function animateWeaponRoll(targetWeapon, callback) {
+            const nameEl = document.getElementById('dropped-weapon-name');
+            const actionsEl = document.getElementById('action-buttons');
+            actionsEl.classList.add('opacity-0', 'pointer-events-none');
+            let pool = Object.keys(OFFENSIVE_WEAPONS);
+            if (gameState.activePlayerId === 'switzerland') pool = SWISS_WEAPONS;
+            let iterations = 0; let speed = 40; const totalIterations = 20;
+            const roll = () => {
+                const randomKey = pool[Math.floor(Math.random() * pool.length)];
+                const weapon = OFFENSIVE_WEAPONS[randomKey];
+                nameEl.innerText = weapon ? getLoc(weapon.name) : '...';
+                iterations++;
+                if (iterations < totalIterations) { speed *= 1.15; setTimeout(roll, speed); } else {
+                    const final = OFFENSIVE_WEAPONS[targetWeapon];
+                    nameEl.innerText = final ? getLoc(final.name) : '???';
+                    nameEl.classList.add('text-green-400', 'scale-125', 'transition-transform', 'duration-300');
+                    setTimeout(() => nameEl.classList.remove('text-green-400', 'scale-125'), 500);
+                    actionsEl.classList.remove('opacity-0', 'pointer-events-none');
+                    actionsEl.classList.add('anim-appear');
+                    if (callback) callback();
+                }
+            };
+            roll();
+        }
+
+        function startGame() {
+            if (window.innerWidth <= 768 && !languageChosen) {
+                showNotification(currentLang === 'ru' ? 'Пожалуйста, выберите язык перед началом игры.' : 'Please choose language before starting.');
+                return;
+            }
+
+            const modeInput = document.querySelector('input[name="gamemode"]:checked');
+            gameState.mode = modeInput ? modeInput.value : 'relay';
+            const isDuel = document.getElementById('duel-mode-check').checked;
+            const required = isDuel ? 2 : 1;
+            if (gameState.setupSelection.length < required) return;
+            gameState.userPlayerId = gameState.setupSelection[0];
+            gameState.secondPlayerId = isDuel ? gameState.setupSelection[1] : null;
+            const emoji = document.getElementById('header-emoji');
+            emoji.style.opacity = '1';
+            emoji.style.display = 'inline-block';
+            emoji.classList.add('anim-spin-fly');
+            document.getElementById('start-btn').disabled = true;
+            document.getElementById('region-btn').classList.add('opacity-50', 'pointer-events-none');
+            setTimeout(() => {
+                const isExtended = document.getElementById('extended-mode-check').checked;
+                let activeCountries = COUNTRIES_CONFIG.filter(c => !c.extended || isExtended);
+                
+                gameState.players = activeCountries.map(c => {
+                    let maxAllies = 5;
+                    const diff = c.diff;
+                    if (isExtended) {
+                        if (diff === 'VERY_EASY') maxAllies = 4;
+                        else if (diff === 'EASY') maxAllies = 5;
+                        else if (diff === 'MEDIUM') maxAllies = 7;
+                        else if (diff === 'HARD') maxAllies = 9;
+                        else if (diff === 'VERY_HARD') maxAllies = 11;
+                        else if (diff === 'LUCK') maxAllies = 4;
+                    } else {
+                        if (diff === 'VERY_EASY') maxAllies = 3;
+                        else if (diff === 'EASY') maxAllies = 4;
+                        else if (diff === 'MEDIUM') maxAllies = 5;
+                        else if (diff === 'HARD') maxAllies = 6;
+                        else if (diff === 'VERY_HARD') maxAllies = 7;
+                        else if (diff === 'LUCK') maxAllies = 4;
+                    }
+                    return { id: c.id, flag: c.flag, hp: c.hp || 10, maxHp: c.hp || 10, shield: 0, nukes: c.nukes || 0, nukeCd: 0, isAlive: true, allies: [], maxAllies: maxAllies, dotTurns: 0, isPacifist: c.isPacifist || false, heartsReceived: {} };
+                });
+                
+                // Re-apply Lore Allies logic limited to active players
+                const activeIds = gameState.players.map(p => p.id);
+                LORE_GROUPS.forEach(group => {
+                    const presentMembers = group.ids.filter(id => activeIds.includes(id));
+                    if (presentMembers.length >= 2) {
+                         presentMembers.forEach(mId => {
+                             const member = gameState.players.find(p => p.id === mId);
+                             presentMembers.forEach(allyId => {
+                                 if (mId !== allyId && !member.allies.includes(allyId)) {
+                                     member.allies.push(allyId);
+                                 }
+                             });
+                         });
+                    }
+                });
+
+                gameState.moveCount = 0; gameState.isGameOver = false; gameState.logs = []; gameState.badgeState = {}; gameState.lastEnemyAttacked = null;
+                document.getElementById('game-log').innerHTML = '';
+                const alivePlayers = gameState.players;
+                const starter = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
+                gameState.roundCount = 0; gameState.turnQueue = [];
+                if (gameState.mode === 'relay' || gameState.mode === 'random') gameState.activePlayerId = starter.id; else gameState.activePlayerId = null;
+                document.getElementById('setup-screen').classList.add('hidden');
+                document.getElementById('game-ui').classList.remove('hidden');
+                const pauseBtn = document.getElementById('ui-pause-btn');
+                if (pauseBtn) {
+                    pauseBtn.classList.remove('hidden');
+                    pauseBtn.innerText = '⏸️';
+                    pauseBtn.title = currentLang === 'ru' ? 'Пауза' : 'Pause';
+                }
+                if (isDuel) log(tLog('startDuel', getCountryName(gameState.userPlayerId), getCountryName(gameState.secondPlayerId)), 'system'); else log(tLog('start', getCountryName(gameState.userPlayerId)), 'system');
+                if (gameState.mode === 'relay') log(tLog('modeRelay'), 'system'); else if (gameState.mode === 'random') log(tLog('modeRandom'), 'system'); else if (gameState.mode === 'multistep') log(tLog('modeMultistep'), 'system');
+                processTurn();
+            }, 1200);
+        }
+
+        function restartGame() {
+            const emoji = document.getElementById('header-emoji');
+            emoji.classList.remove('anim-spin-fly');
+            emoji.classList.remove('anim-enter');
+            emoji.style.opacity = '1';
+            emoji.style.display = 'inline-block';
+            void emoji.offsetWidth;
+            emoji.classList.add('anim-enter');
+            document.getElementById('victory-modal').classList.add('hidden');
+            document.getElementById('game-ui').classList.add('hidden');
+            document.getElementById('setup-screen').classList.remove('hidden');
+            const pauseBtn = document.getElementById('ui-pause-btn');
+            if (pauseBtn) { pauseBtn.classList.add('hidden'); pauseBtn.innerText = '⏸️'; pauseBtn.title = currentLang === 'ru' ? 'Пауза' : 'Pause'; }
+            document.getElementById('region-btn').classList.remove('opacity-50', 'pointer-events-none');
+            gameState.userPlayerId = null; gameState.secondPlayerId = null; gameState.setupSelection = [];
+            gameState.lastSelectedTarget = null;
+            gameState.badgeState = {};
+            document.getElementById('start-btn').disabled = true;
+            initSetup();
+        }
+
+        function getPlayer(id) { return gameState.players.find(p => p.id === id); }
+        function areLoreAllies(id1, id2) {
+            const isExtended = document.getElementById('extended-mode-check')?.checked;
+            if (!isExtended) return false;
+            for (const group of LORE_GROUPS) { if (group.ids.includes(id1) && group.ids.includes(id2)) return true; }
+            return false;
+        }
+        function isAlly(id1, id2) {
+            if (id1 === id2) return true;
+            const p1 = getPlayer(id1);
+            if (areLoreAllies(id1, id2)) return true;
+            return p1.allies.includes(id2);
+        }
+        function canAlly(id1, id2) {
+            const p1 = getPlayer(id1);
+            const p2 = getPlayer(id2);
+            if (!p1 || !p2) return false;
+            if (isAlly(id1, id2)) return true;
+            if (p1.allies.length >= p1.maxAllies) return false;
+            if (p2.allies.length >= p2.maxAllies) return false;
+            return true;
+        }
+        function addAlliance(p1, p2) {
+            if (p1.id === p2.id) return;
+            if (!p1.allies.includes(p2.id)) p1.allies.push(p2.id);
+            if (!p2.allies.includes(p1.id)) p2.allies.push(p1.id);
+            log(tLog('allianceForm', getCountryName(p1.id), getCountryName(p2.id)), 'system');
+            renderGame();
+        }
+        function breakAlliance(p1, p2) {
+            if (areLoreAllies(p1.id, p2.id)) return;
+            let broken = false;
+            if (p1.allies.includes(p2.id)) { p1.allies = p1.allies.filter(id => id !== p2.id); broken = true; }
+            if (p2.allies.includes(p1.id)) { p2.allies = p2.allies.filter(id => id !== p1.id); broken = true; }
+            if (broken) { log(tLog('allianceBreak', getCountryName(p1.id), getCountryName(p2.id)), 'system'); renderGame(); }
+        }
+
+        function log(msg, type = 'neutral') {
+            const logContainer = document.getElementById('game-log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry mb-1 pb-1 border-b border-gray-800 last:border-0';
+            let color = 'text-gray-300';
+            if (type === 'attack') color = 'text-red-400';
+            if (type === 'heal') color = 'text-green-400';
+            if (type === 'system') color = 'text-yellow-400';
+            entry.innerHTML = `<span class="${color}">${msg}</span>`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function triggerAnimation(playerId, animClass) {
+            const card = document.getElementById(`card-${playerId}`);
+            if (card) { card.classList.remove('anim-shake', 'anim-heal', 'anim-damage'); void card.offsetWidth; card.classList.add(animClass); }
+        }
+
+        function triggerPersistentPulse(id, type) {
+            if(!gameState.activeEffects) gameState.activeEffects = {};
+            gameState.activeEffects[id] = { type: type, start: Date.now() };
+        }
+
+        function processTurn() {
+            if (gameState.isGameOver) return;
+            if (isPaused) return;
+            checkWinCondition();
+            if (gameState.isGameOver) return;
+
+            if (gameState.mode === 'multistep') {
+                if (gameState.turnQueue.length === 0) {
+                    gameState.roundCount++;
+                    log(tLog('roundStart', gameState.roundCount), 'system');
+                    const alive = gameState.players.filter(p => p.isAlive).map(p => p.id);
+                    for (let i = alive.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [alive[i], alive[j]] = [alive[j], alive[i]]; }
+                    gameState.turnQueue = alive;
+                }
+                gameState.activePlayerId = gameState.turnQueue.shift();
+                // Bug fix: Check if activePlayerId is undefined (game over or empty queue edge case)
+                if (!gameState.activePlayerId || !getPlayer(gameState.activePlayerId)) { checkWinCondition(); return; }
+                if (!getPlayer(gameState.activePlayerId).isAlive) { processTurn(); return; }
+            } else if (gameState.mode === 'random') {
+                 const alive = gameState.players.filter(p => p.isAlive);
+                 if (alive.length === 0) return;
+                 const nextRandom = alive[Math.floor(Math.random() * alive.length)];
+                 gameState.activePlayerId = nextRandom.id;
+            } else {
+                const p = getPlayer(gameState.activePlayerId);
+                if (!p || !p.isAlive) {
+                    const alive = gameState.players.filter(p => p.isAlive);
+                    if (alive.length === 0) return;
+                    const nextRandom = alive[Math.floor(Math.random() * alive.length)];
+                    gameState.activePlayerId = nextRandom.id;
+                }
+            }
+
+            gameState.moveCount++;
+            const activePlayer = getPlayer(gameState.activePlayerId);
+            gameState.players.forEach(p => { if (p.shield > 0) p.shield--; });
+            if (activePlayer.nukeCd > 0) activePlayer.nukeCd--;
+            if (activePlayer.dotTurns > 0) {
+                const dmg = 1; log(tLog('dot', getCountryName(activePlayer.id)), 'attack');
+                applyDamage(null, activePlayer, dmg, 'dot');
+                activePlayer.dotTurns--;
+                if (!activePlayer.isAlive) { checkWinCondition(); if (!gameState.isGameOver) processTurn(); return; }
+            }
+            renderGame();
+            const isP1 = activePlayer.id === gameState.userPlayerId;
+            const isP2 = activePlayer.id === gameState.secondPlayerId;
+            if (isP1 || isP2) {
+                rollUserWeapon();
+                const statusText = isP1 ? t('turnStatusP1') : t('turnStatusP2');
+                const statusColor = isP1 ? "text-green-400" : "text-purple-400";
+                document.getElementById('turn-status').innerText = statusText;
+                document.getElementById('turn-status').className = `font-bold ${statusColor}`;
+                renderGame();
+                animateWeaponRoll(gameState.userCurrentWeapon);
+            } else {
+                document.getElementById('turn-status').innerText = t('turnStatusMove') + getCountryName(activePlayer.id);
+                document.getElementById('turn-status').className = "font-bold text-yellow-400";
+                setTimeout(() => runAiTurn(activePlayer), 1000);
+            }
+        }
+
+        function showFloatingText(elementId, text, colorClass) {
+            const card = document.getElementById(`card-${elementId}`);
+            if (!card) return;
+            const rect = card.getBoundingClientRect();
+            const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const centerX = rect.left + scrollLeft + rect.width / 2;
+            const centerY = rect.top + scrollTop + rect.height / 2;
+            const el = document.createElement('div');
+            el.className = `floating-text ${colorClass}`;
+            el.innerText = text;
+            el.style.left = `${centerX}px`; el.style.top = `${centerY}px`; el.style.position = 'absolute'; el.style.zIndex = '9999';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1200);
+        }
+
+        function applyDamage(attacker, target, amount, type) {
+            if (!target.isAlive) return;
+            if (attacker && areLoreAllies(attacker.id, target.id)) return; 
+            if (attacker && attacker.id !== target.id) breakAlliance(attacker, target);
+            let damageToHp = amount;
+            if (target.shield > 0 && type !== 'pierce' && type !== 'dot' && type !== 'nuke') {
+                const absorbed = Math.ceil(amount * (2/3));
+                damageToHp = Math.max(0, amount - absorbed);
+                target.shield = Math.max(0, target.shield - absorbed);
+                log(tLog('shieldAbsorb', getCountryName(target.id), absorbed), 'system');
+                showFloatingText(target.id, '🛡️', 'text-blue-300');
+            } else if (target.shield > 0 && type === 'pierce') log(tLog('shieldPierce', getCountryName(target.id)), 'attack');
+
+            triggerAnimation(target.id, 'anim-damage');
+            if (damageToHp > 0) {
+                triggerAnimation(target.id, 'anim-shake');
+                triggerPersistentPulse(target.id, 'damage');
+            }
+            target.hp -= damageToHp;
+            if (damageToHp > 0) showFloatingText(target.id, '-' + damageToHp + ' HP', 'text-red-500'); else if (amount > 0) showFloatingText(target.id, '🛡️', 'text-blue-400');
+            if (target.hp <= 0) {
+                target.hp = 0; target.isAlive = false; target.shield = 0;
+                log(tLog('kill', getCountryName(target.id)), 'attack');
+                if (target.nukes > 0 && attacker && attacker.isAlive) {
+                    attacker.nukes += target.nukes;
+                    log(tLog('lootNukes', getCountryName(attacker.id), target.nukes), 'system');
+                    target.nukes = 0;
+                }
+            } else if (damageToHp > 0) {
+                if(attacker) log(tLog('dmgDealt', getCountryName(attacker.id), damageToHp, getCountryName(target.id)), 'attack');
+                else log(tLog('dmgTaken', getCountryName(target.id), damageToHp), 'attack');
+            }
+        }
+
+        function selectTargetFromGrid(targetId) {
+            const select = document.getElementById('target-select');
+            if (gameState.lastSelectedTarget === targetId) {
+                confirmAction();
+                return;
+            }
+            gameState.lastSelectedTarget = targetId;
+            select.value = targetId;
+            const isAttack = OFFENSIVE_WEAPONS[selectedAction] || selectedAction === 'nuke';
+            const ringColor = isAttack ? 'ring-red-500' : 'ring-green-500';
+            document.querySelectorAll('[id^="card-"]').forEach(c => { c.classList.remove('ring-4', 'ring-red-500', 'ring-green-500', 'target-active'); if (c.classList.contains('cursor-pointer')) c.classList.add('ring-2', 'ring-gray-500'); });
+            const card = document.getElementById(`card-${targetId}`);
+            if (card) { card.classList.remove('ring-2', 'ring-gray-500'); card.classList.add('ring-4', ringColor, 'target-active'); }
+        }
+
+        function prepareAction(actionKey) {
+            const actingPlayerId = gameState.activePlayerId;
+            const user = getPlayer(actingPlayerId);
+            if (!user.isAlive) return;
+            selectedAction = actionKey;
+            gameState.lastSelectedTarget = null;
+            const targetSelect = document.getElementById('target-select');
+            targetSelect.innerHTML = '';
+            const isWeapon = OFFENSIVE_WEAPONS[actionKey] || actionKey === 'nuke';
+            gameState.players.forEach(p => {
+                let isValid = false;
+                if (isWeapon) { if (p.id !== user.id && p.isAlive) { if (areLoreAllies(user.id, p.id)) isValid = false; else isValid = true; } } 
+                else { if (actionKey === 'heart' && p.isAlive && p.id !== user.id) isValid = true; if (actionKey === 'revive' && !p.isAlive) isValid = true; }
+                
+                if (isValid && (actionKey === 'heart' || actionKey === 'revive')) {
+                    if (!canAlly(user.id, p.id)) isValid = false;
+                }
+
+                if (isValid) {
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    const relation = isAlly(user.id, p.id) ? '🤝' : '⚔️';
+                    opt.textContent = `${relation} ${p.flag} ${getLoc(COUNTRIES_CONFIG.find(c=>c.id===p.id).name)} [HP: ${p.hp}]`;
+                    targetSelect.appendChild(opt);
+                    const card = document.getElementById(`card-${p.id}`);
+                    if (card) { card.classList.add('cursor-pointer', 'ring-2', 'ring-gray-500', 'hover:brightness-110'); card.onclick = () => selectTargetFromGrid(p.id); }
+                } else {
+                    const card = document.getElementById(`card-${p.id}`);
+                    if (card) card.classList.add('opacity-40', 'grayscale');
+                }
+            });
+            if (targetSelect.options.length === 0) { showNotification(t('msgNoTargets')); cancelAction(); return; }
+            targetSelect.onchange = (e) => selectTargetFromGrid(e.target.value);
+            document.getElementById('action-buttons').classList.add('hidden');
+            document.getElementById('current-weapon-info').classList.add('hidden');
+            document.getElementById('target-selection').classList.remove('hidden');
+            if (targetSelect.options.length > 0) {
+                const firstId = targetSelect.options[0].value;
+                const isAttack = OFFENSIVE_WEAPONS[selectedAction] || selectedAction === 'nuke';
+                const ringColor = isAttack ? 'ring-red-500' : 'ring-green-500';
+                document.querySelectorAll('[id^="card-"]').forEach(c => { c.classList.remove('ring-4', 'ring-red-500', 'ring-green-500', 'target-active'); if (c.classList.contains('cursor-pointer')) c.classList.add('ring-2', 'ring-gray-500'); });
+                const card = document.getElementById(`card-${firstId}`);
+                if (card) { card.classList.remove('ring-2', 'ring-gray-500'); card.classList.add('ring-4', ringColor, 'target-active'); }
+            }
+        }
+
+        function cancelAction() {
+            selectedAction = null;
+            gameState.lastSelectedTarget = null;
+            document.getElementById('action-buttons').classList.remove('hidden');
+            document.getElementById('current-weapon-info').classList.remove('hidden');
+            document.getElementById('target-selection').classList.add('hidden');
+            document.querySelectorAll('.target-active').forEach(el => el.classList.remove('target-active'));
+            renderGame();
+        }
+
+        let isProcessingAction = false;
+
+        function confirmAction() {
+            if (isProcessingAction) return;
+            const targetId = document.getElementById('target-select').value;
+            const user = getPlayer(gameState.activePlayerId);
+            const target = getPlayer(targetId);
+            
+            if (!user || !target) return; // Safety check
+
+            const userName = getCountryName(user.id);
+            const targetName = getCountryName(target.id);
+            const action = selectedAction;
+            
+            isProcessingAction = true;
+            const confirmBtn = document.getElementById('btn-confirm');
+            if (confirmBtn) {
+                confirmBtn.disabled = true;
+                confirmBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+
+            cancelAction(); // This hides the UI, but we keep the lock
+            
+            animateAttack(user.id, target.id, action, () => {
+                if (OFFENSIVE_WEAPONS[action]) {
+                    const w = OFFENSIVE_WEAPONS[action];
+                    if (action === 'potion') { log(tLog('potionThrow', userName, targetName), 'attack'); target.dotTurns = 2; breakAlliance(user, target); } else applyDamage(user, target, w.damage, w.type);
+                } else if (action === 'nuke') {
+                    if (user.nukes > 0 && user.nukeCd === 0) { user.nukes--; user.nukeCd = 5; log(tLog('nukeLaunch', userName, targetName), 'attack'); applyDamage(user, target, 5, 'nuke'); }
+                } else if (FRIENDLY_ACTIONS[action]) {
+                    if (action === 'heart') { 
+                        if (user.hp > 1) { 
+                            user.hp -= 1; target.hp += 1; user.shield = 5; target.shield = 5; 
+                            triggerAnimation(target.id, 'anim-heal'); triggerAnimation(user.id, 'anim-heal'); 
+                            triggerPersistentPulse(target.id, 'heal'); triggerPersistentPulse(user.id, 'heal');
+                            
+                            if (aiDifficulty === 'hard' && !isAlly(user.id, target.id)) {
+                                // Hard Mode: Hearts require multiple to form alliance
+                                if (!user.heartsReceived) user.heartsReceived = {};
+                                if (!user.heartsReceived[target.id]) user.heartsReceived[target.id] = 0;
+                                user.heartsReceived[target.id]++;
+                                const req = 2 + (target.id.charCodeAt(0) % 2);
+                                log(`💓 ${userName} sends alliance offer to ${targetName} (${user.heartsReceived[target.id]}/${req}).`, 'heal');
+                                
+                                if (user.heartsReceived[target.id] >= req && user.allies.length < user.maxAllies && target.allies.length < target.maxAllies) {
+                                    renderGame();
+                                    // Show the alliance offer to the target player
+                                    if (target.id === gameState.userPlayerId || target.id === gameState.secondPlayerId) {
+                                        document.getElementById('alliance-offer-modal').classList.remove('hidden');
+                                        document.getElementById('offer-country').innerText = user.flag;
+                                        const btnAccept = document.getElementById('btn-accept-ally');
+                                        const heartsText = document.getElementById('offer-hearts-required');
+                                        heartsText.innerText = `(Required ${req} hearts)`;
+                                        
+                                        // Disable Yes button if target has max allies
+                                        if (target.allies.length >= target.maxAllies) {
+                                            btnAccept.disabled = true;
+                                            btnAccept.classList.add('opacity-50', 'cursor-not-allowed');
+                                            btnAccept.title = 'You have reached max allies';
+                                        } else {
+                                            btnAccept.disabled = false;
+                                            btnAccept.classList.remove('opacity-50', 'cursor-not-allowed');
+                                            btnAccept.title = '';
+                                        }
+                                        
+                                        pendingAllianceResolve = (accepted) => {
+                                            if (accepted && canAlly(user.id, target.id)) {
+                                                log(`✅ ${targetName} accepted ${userName}'s alliance!`, 'system');
+                                                addAlliance(user, target);
+                                            } else {
+                                                log(`❌ ${targetName} rejected ${userName}'s alliance offer!`, 'system');
+                                            }
+                                            renderGame();
+                                            endTurn(targetId);
+                                        };
+                                        isProcessingAction = false;
+                                        if (confirmBtn) {
+                                            confirmBtn.disabled = false;
+                                            confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                                        }
+                                        return;
+                                    } else {
+                                        // AI accepts
+                                        addAlliance(user, target);
+                                    }
+                                }
+                            } else {
+                                // Normal Mode: Direct alliance
+                                log(tLog('heartGive', userName, targetName), 'heal');
+                                addAlliance(user, target);
+                            }
+                        } 
+                    } 
+                    else if (action === 'revive') { 
+                        if (user.hp > 2) { 
+                            user.hp -= 2; target.isAlive = true; target.hp = 2; 
+                            triggerAnimation(target.id, 'anim-heal'); 
+                            triggerPersistentPulse(target.id, 'heal');
+                            log(tLog('revive', userName, targetName), 'heal'); addAlliance(user, target); 
+                        } 
+                    }
+                }
+                renderGame(); 
+                endTurn(targetId);
+                
+                // Unlock after a short delay to prevent accidental double clicks if endTurn is fast
+                setTimeout(() => {
+                    isProcessingAction = false;
+                    if (confirmBtn) {
+                        confirmBtn.disabled = false;
+                        confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    }
+                }, 500);
+            });
+        }
+
+        function endTurn(lastTargetId) {
+            if (gameState.mode === 'relay') gameState.activePlayerId = lastTargetId;
+            setTimeout(processTurn, 1000);
+        }
+
+        function runAiTurn(ai) {
+            if (!ai.isAlive || gameState.isGameOver) return;
+            const aiName = getCountryName(ai.id);
+            let nextTargetId = null;
+            let actionTypeForAnim = 'attack'; let animTargetId = null; let actionLogic = null;
+            const alivePlayers = gameState.players.filter(p => p.isAlive);
+            
+            // --- EASY MODE ---
+            if (aiDifficulty === 'easy') {
+                const potentialTargets = gameState.players.filter(p => p.isAlive && p.id !== ai.id);
+                if (potentialTargets.length > 0) {
+                    const target = potentialTargets[Math.floor(Math.random() * potentialTargets.length)];
+                    nextTargetId = target.id; animTargetId = target.id;
+                    let keys = Object.keys(OFFENSIVE_WEAPONS);
+                    if (ai.id === 'switzerland') keys = SWISS_WEAPONS;
+                    const key = keys[Math.floor(Math.random() * keys.length)];
+                    actionTypeForAnim = key; const w = OFFENSIVE_WEAPONS[key];
+                    actionLogic = () => { if (key === 'potion') { log(tLog('potionThrow', aiName, getCountryName(target.id)), 'attack'); target.dotTurns = 2; breakAlliance(ai, target); } else { applyDamage(ai, target, w.damage, w.type); } };
+                }
+            } 
+            // --- NORMAL / HARD MODE ---
+            else {
+                const betrayalMode = alivePlayers.length <= 2;
+                const config = COUNTRIES_CONFIG.find(c => c.id === ai.id);
+                const loreAllies = config.loreAllies || [];
+
+                // Pacifist Check (Hard Mode)
+                if (aiDifficulty === 'hard' && ai.isPacifist && ai.hp === ai.maxHp && alivePlayers.length > 2) {
+                     // Pacifists prefer to heal allies or stay defensive
+                     const hurtAlly = alivePlayers.find(p => p.id !== ai.id && isAlly(ai.id, p.id) && p.hp < p.maxHp);
+                     if (hurtAlly && ai.hp > 3) {
+                         nextTargetId = hurtAlly.id; actionTypeForAnim = 'heart'; animTargetId = hurtAlly.id;
+                         actionLogic = () => { ai.hp -= 1; hurtAlly.hp += 1; ai.shield = 5; hurtAlly.shield = 5; log(`💓 ${aiName} heals ${getCountryName(hurtAlly.id)} (pacifist support).`, 'heal'); triggerAnimation(hurtAlly.id, 'anim-heal'); };
+                     } else {
+                         // Skip turn - pacifist does nothing when healthy and no attacked allies
+                         log(`${aiName} chooses not to act (pacifist defense mode).`, 'system');
+                         endTurn(gameState.activePlayerId);
+                         return;
+                     }
+                }
+
+                // Revive Logic
+                if (!nextTargetId && ai.hp > 6 && alivePlayers.length < 4 && !betrayalMode) {
+                     const dead = gameState.players.find(p => !p.isAlive && (loreAllies.includes(p.id) || aiDifficulty === 'hard'));
+                     if (dead && canAlly(ai.id, dead.id)) {
+                         nextTargetId = dead.id; actionTypeForAnim = 'revive'; animTargetId = dead.id;
+                         actionLogic = () => { ai.hp -= 2; dead.isAlive = true; dead.hp = 2; log(tLog('revive', aiName, getCountryName(dead.id)), 'heal'); triggerAnimation(dead.id, 'anim-heal'); addAlliance(ai, dead); };
+                     }
+                }
+                
+                // Heal/Alliance Logic
+                if (!nextTargetId) {
+                    const hurtAlly = alivePlayers.find(p => p.id !== ai.id && isAlly(ai.id, p.id) && p.hp < 5);
+                    // In Hard mode, more aggressive alliance forming
+                    const tryAlly = alivePlayers.find(p => p.id !== ai.id && !isAlly(ai.id, p.id) && canAlly(ai.id, p.id) && (loreAllies.includes(p.id) || (aiDifficulty === 'hard' && p.hp > 5)));
+                    
+                    if (hurtAlly && ai.hp > 4 && !betrayalMode) {
+                        nextTargetId = hurtAlly.id; actionTypeForAnim = 'heart'; animTargetId = hurtAlly.id;
+                        actionLogic = () => { ai.hp -= 1; hurtAlly.hp += 1; ai.shield = 5; hurtAlly.shield = 5; log(tLog('heartGive', aiName, getCountryName(hurtAlly.id)), 'heal'); triggerAnimation(hurtAlly.id, 'anim-heal'); };
+                    } else if (tryAlly && ai.hp > 3 && !betrayalMode && (aiDifficulty !== 'hard' || gameState.moveCount > 10)) {
+                         // Hard mode alliance logic
+                         if (aiDifficulty === 'hard') {
+                             if (!tryAlly.heartsReceived) tryAlly.heartsReceived = {};
+                             if (!tryAlly.heartsReceived[ai.id]) tryAlly.heartsReceived[ai.id] = 0;
+                             const req = 2 + (tryAlly.id.charCodeAt(0) % 2);
+                             if (tryAlly.heartsReceived[ai.id] < req) {
+                                 // Just send heart
+                                 nextTargetId = tryAlly.id; actionTypeForAnim = 'heart'; animTargetId = tryAlly.id;
+                                 actionLogic = () => { 
+                                     ai.hp -= 1; tryAlly.hp += 1; ai.shield = 5; tryAlly.shield = 5; 
+                                     tryAlly.heartsReceived[ai.id]++;
+                                     log(`💓 ${aiName} bribes ${getCountryName(tryAlly.id)} (${tryAlly.heartsReceived[ai.id]}/${req}).`, 'heal'); 
+                                     triggerAnimation(tryAlly.id, 'anim-heal'); 
+                                 };
+                             } else {
+                                 // Offer alliance
+                                 nextTargetId = tryAlly.id; actionTypeForAnim = 'heart'; animTargetId = tryAlly.id;
+                                 if (tryAlly.id === gameState.userPlayerId || tryAlly.id === gameState.secondPlayerId) {
+                                     // Ask Player
+                                     actionLogic = () => {
+                                         document.getElementById('alliance-offer-modal').classList.remove('hidden');
+                                         document.getElementById('offer-country').innerText = ai.flag;
+                                         pendingAllianceResolve = (accepted) => {
+                                             ai.hp -= 1; tryAlly.hp += 1; ai.shield = 5; tryAlly.shield = 5;
+                                             if (accepted && canAlly(ai.id, tryAlly.id)) {
+                                                 log(tLog('heartGive', aiName, getCountryName(tryAlly.id)), 'heal'); addAlliance(ai, tryAlly);
+                                             } else {
+                                                 log(`💔 ${getCountryName(tryAlly.id)} rejected ${aiName}'s alliance offer!`, 'system');
+                                             }
+                                             triggerAnimation(tryAlly.id, 'anim-heal');
+                                             renderGame(); endTurn(tryAlly.id);
+                                         };
+                                     };
+                                     // Prevent standard endTurn, wait for callback
+                                     animateAttack(ai.id, animTargetId, actionTypeForAnim, () => { actionLogic(); });
+                                     return; 
+                                 } else {
+                                     // AI accepts
+                                     actionLogic = () => { ai.hp -= 1; tryAlly.hp += 1; ai.shield = 5; tryAlly.shield = 5; log(tLog('heartGive', aiName, getCountryName(tryAlly.id)), 'heal'); addAlliance(ai, tryAlly); triggerAnimation(tryAlly.id, 'anim-heal'); };
+                                 }
+                             }
+                         } else {
+                             // Normal mode alliance
+                             nextTargetId = tryAlly.id; actionTypeForAnim = 'heart'; animTargetId = tryAlly.id;
+                             actionLogic = () => { ai.hp -= 1; tryAlly.hp += 1; ai.shield = 5; tryAlly.shield = 5; log(tLog('heartGive', aiName, getCountryName(tryAlly.id)), 'heal'); addAlliance(ai, tryAlly); triggerAnimation(tryAlly.id, 'anim-heal'); };
+                         }
+                    }
+                }
+
+                // Attack Logic
+                if (!nextTargetId) {
+                    let enemies = alivePlayers.filter(p => p.id !== ai.id && !isAlly(ai.id, p.id));
+                    if (betrayalMode || enemies.length === 0) enemies = alivePlayers.filter(p => p.id !== ai.id && !areLoreAllies(ai.id, p.id));
+                    
+                    if (enemies.length > 0) {
+                        // Hard Mode: Allies coordinate attacks on same target
+                        let target = enemies[Math.floor(Math.random() * enemies.length)];
+                        if (aiDifficulty === 'hard') {
+                            // Prefer to attack the last enemy that was attacked (coordinated ally tactics)
+                            if (gameState.lastEnemyAttacked && enemies.some(e => e.id === gameState.lastEnemyAttacked)) {
+                                target = enemies.find(e => e.id === gameState.lastEnemyAttacked);
+                            } else {
+                                // Otherwise, target lowest HP (hard mode strategy)
+                                target = enemies.reduce((prev, curr) => prev.hp < curr.hp ? prev : curr);
+                            }
+                        }
+
+                        nextTargetId = target.id; animTargetId = target.id;
+                        const targetName = getCountryName(target.id);
+                        if (ai.nukes > 0 && ai.nukeCd === 0 && target.hp > 5 && ai.id !== 'switzerland') {
+                            actionTypeForAnim = 'nuke';
+                            actionLogic = () => { ai.nukes--; ai.nukeCd = 5; log(tLog('nukeDrop', aiName, targetName), 'attack'); applyDamage(ai, target, 5, 'nuke'); gameState.lastEnemyAttacked = target.id; };
+                        } else {
+                            let keys = Object.keys(OFFENSIVE_WEAPONS);
+                            if (ai.id === 'switzerland') keys = SWISS_WEAPONS;
+                            const key = keys[Math.floor(Math.random() * keys.length)];
+                            actionTypeForAnim = key;
+                            const w = OFFENSIVE_WEAPONS[key];
+                            actionLogic = () => { if (key === 'potion') { log(tLog('potionThrow', aiName, targetName), 'attack'); target.dotTurns = 2; breakAlliance(ai, target); gameState.lastEnemyAttacked = target.id; } else { applyDamage(ai, target, w.damage, w.type); gameState.lastEnemyAttacked = target.id; } };
+                        }
+                    }
+                }
+            }
+
+            if (!nextTargetId) { 
+                const alive = gameState.players.filter(p => p.isAlive); 
+                if (alive.length > 0) nextTargetId = alive[Math.floor(Math.random() * alive.length)].id; 
+                else nextTargetId = ai.id;
+                if(actionLogic === null) actionLogic = () => {}; 
+            }
+            if (!actionLogic) actionLogic = () => { }; // safety net
+            if (animTargetId) {
+                animateAttack(ai.id, animTargetId, actionTypeForAnim, () => {
+                    actionLogic();
+                    renderGame();
+                    if (!gameState.isGameOver) endTurn(nextTargetId);
+                });
+            } else {
+                actionLogic();
+                renderGame();
+                if (!gameState.isGameOver) endTurn(nextTargetId);
+            }
+        }
+
+        function checkWinCondition() {
+            const alive = gameState.players.filter(p => p.isAlive);
+            if (alive.length === 0) { endGame(tLog('winDraw'), null); return; }
+            const isExtended = document.getElementById('extended-mode-check')?.checked;
+            if (isExtended && alive.length > 1) {
+                for (const group of LORE_GROUPS) {
+                    const groupIds = group.ids;
+                    const allAliveAreInGroup = alive.every(p => groupIds.includes(p.id));
+                    if (allAliveAreInGroup) { const winnerNames = alive.map(p => getCountryName(p.id)).join(' & '); const groupName = getLoc(group.name); const isPlayerWin = alive.some(p => p.id === gameState.userPlayerId); endGame(`🏆 ${groupName} Wins! (${winnerNames})`, isPlayerWin); return; }
+                }
+            }
+            if (alive.length === 1) {
+                const isPlayerWin = alive[0].id === gameState.userPlayerId;
+                endGame(tLog('winSolo', getCountryName(alive[0].id)), isPlayerWin);
+            }
+        }
+
+        function endGame(msg, isPlayerWin) { 
+            gameState.isGameOver = true; 
+            document.getElementById('victory-message').textContent = msg; 
+            document.getElementById('victory-modal').classList.remove('hidden');
+            if (isPlayerWin !== null && isPlayerWin !== undefined) recordGameResult(isPlayerWin);
+        }
+
+        // --- STATS & CLOUD SAVE ---
+        const STATS_KEY = 'fallofflags_player_stats';
+        const CLOUD_AUTO_SAVE = true;
+
+        function loadPlayerStats() {
+            const saved = localStorage.getItem(STATS_KEY);
+            if (saved) {
+                try {
+                    gameState.playerStats = JSON.parse(saved);
+                } catch (e) {
+                    gameState.playerStats = { wins: 0, losses: 0, totalGames: 0 };
+                }
+            }
+            updateStatsUI();
+        }
+
+        function savePlayerStats() {
+            localStorage.setItem(STATS_KEY, JSON.stringify(gameState.playerStats));
+            if (CLOUD_AUTO_SAVE) syncStatsToCloud();
+        }
+
+        function recordGameResult(isWin) {
+            if (isWin === true) gameState.playerStats.wins++;
+            else if (isWin === false) gameState.playerStats.losses++;
+            // draw: no win/loss change
+            gameState.playerStats.totalGames++;
+            savePlayerStats();
+            updateStatsUI();
+        }
+
+        function updateStatsUI() {
+            document.getElementById('stat-wins').textContent = gameState.playerStats.wins || 0;
+            document.getElementById('stat-losses').textContent = gameState.playerStats.losses || 0;
+            document.getElementById('stat-total').textContent = gameState.playerStats.totalGames || 0;
+            updateExtendedModeAvailability();
+        }
+
+        function clearAllStats() {
+            if (confirm(currentLang === 'ru' ? 'Очистить всю статистику?' : 'Clear all statistics?')) {
+                gameState.playerStats = { wins: 0, losses: 0, totalGames: 0 };
+                localStorage.removeItem(STATS_KEY);
+                updateStatsUI();
+                if (CLOUD_AUTO_SAVE) syncStatsToCloud();
+            }
+        }
+
+        // --- YANDEX CLOUD SAVE (Config-based) ---
+        const YANDEX_CONFIG = {
+            enabled: false, // Set to true when you have credentials
+            clientId: '', // from Yandex Console
+            clientSecret: '', // from Yandex Console
+            redirectUri: window.location.origin,
+            accessToken: localStorage.getItem('yandex_access_token') || null
+        };
+
+        function syncStatsToCloud() {
+            if (!YANDEX_CONFIG.enabled) return; // Skip if not configured
+            
+            const stats = gameState.playerStats;
+            const filename = 'fallofflags_stats.json';
+            const fileContent = JSON.stringify(stats);
+            
+            uploadToYandexDisk(filename, fileContent);
+        }
+
+        function uploadToYandexDisk(filename, content) {
+            if (!YANDEX_CONFIG.accessToken) {
+                console.log('No Yandex access token. Using local storage only.');
+                return;
+            }
+
+            const url = `https://cloud-api.yandex.net/v1/disk/resources/upload?path=${filename}&overwrite=true`;
+            
+            fetch(url, {
+                method: 'GET',
+                headers: { 'Authorization': `OAuth ${YANDEX_CONFIG.accessToken}` }
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.href) {
+                    return fetch(data.href, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: content
+                    });
+                }
+            })
+            .catch(err => console.log('Cloud save skipped:', err.message));
+        }
+
+        function loadStatsFromCloud() {
+            if (!YANDEX_CONFIG.enabled || !YANDEX_CONFIG.accessToken) return;
+            
+            const filename = 'fallofflags_stats.json';
+            const url = `https://cloud-api.yandex.net/v1/disk/resources/download?path=${filename}`;
+            
+            fetch(url, {
+                method: 'GET',
+                headers: { 'Authorization': `OAuth ${YANDEX_CONFIG.accessToken}` }
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.href) {
+                    return fetch(data.href);
+                }
+            })
+            .then(r => r.json())
+            .then(cloudStats => {
+                gameState.playerStats = cloudStats;
+                savePlayerStats();
+                updateStatsUI();
+            })
+            .catch(err => console.log('Could not load cloud stats:', err.message));
+        }
+
+        function showYandexAuthDialog() {
+            if (!YANDEX_CONFIG.enabled) {
+                showNotification('Yandex cloud integration not configured. Set credentials in YANDEX_CONFIG.');
+                return;
+            }
+            const authUrl = `https://oauth.yandex.com/authorize?response_type=code&client_id=${YANDEX_CONFIG.clientId}&redirect_uri=${encodeURIComponent(YANDEX_CONFIG.redirectUri)}`;
+            window.open(authUrl, '_blank', 'width=600,height=400');
+        }
+
+
+        function initIntro() {
+            const bg = document.getElementById('intro-bg');
+            if(!bg) return;
+            const sampleCountries = CONFIG_GLOBAL.slice(0, 15);
+            sampleCountries.forEach(c => {
+                const div = document.createElement('div');
+                div.className = "p-4 rounded-xl bg-gray-800 border-2 border-gray-700 opacity-80 flex flex-col items-center justify-center transform scale-90";
+                div.innerHTML = `<div class="text-5xl">${c.flag}</div><div class="font-bold text-gray-500 mt-2 text-center text-xs uppercase">${getLoc(c.name)}</div>`;
+                bg.appendChild(div);
+            });
+            const interval = setInterval(() => {
+                const cards = bg.children; if(cards.length < 2) return;
+                const fromIdx = Math.floor(Math.random() * cards.length); let toIdx = Math.floor(Math.random() * cards.length);
+                while(toIdx === fromIdx) toIdx = Math.floor(Math.random() * cards.length);
+                const fromEl = cards[fromIdx]; const toEl = cards[toIdx];
+                const rect1 = fromEl.getBoundingClientRect(); const rect2 = toEl.getBoundingClientRect();
+                const p = document.createElement('div');
+                p.className = 'fixed z-[101] text-2xl pointer-events-none transition-transform duration-700 ease-in-out blur-[2px]';
+                p.innerText = ['🚀','💣','⚔️','💥'][Math.floor(Math.random()*4)];
+                p.style.left = (rect1.left + rect1.width/2 - 12) + 'px'; p.style.top = (rect1.top + rect1.height/2 - 12) + 'px';
+                document.body.appendChild(p);
+                requestAnimationFrame(() => { const dx = (rect2.left + rect2.width/2) - (rect1.left + rect1.width/2); const dy = (rect2.top + rect2.height/2) - (rect1.top + rect1.height/2); p.style.transform = `translate(${dx}px, ${dy}px)`; });
+                setTimeout(() => { p.remove(); toEl.classList.add('scale-90', 'bg-red-900/50', 'border-red-500'); setTimeout(() => toEl.classList.remove('scale-90', 'bg-red-900/50', 'border-red-500'), 200); }, 700);
+            }, 600);
+            setTimeout(() => { clearInterval(interval); document.getElementById('intro-overlay').style.transform = 'translateY(-100vh)'; setTimeout(() => { const overlay = document.getElementById('intro-overlay'); if(overlay) overlay.remove(); }, 1000); }, 6000);
+        }
+
+        function toggleDevModal() {
+            const modal = document.getElementById('dev-modal');
+            if (modal.classList.contains('hidden')) {
+                devLoadStatsToModal();
+            }
+            modal.classList.toggle('hidden');
+        }
+
+        let devClicks = 0;
+        let devClickTimer = null;
+
+        function setupHeaderEasterEgg() {
+            const headerEmoji = document.getElementById('header-emoji');
+            if(!headerEmoji) return;
+
+            headerEmoji.style.cursor = 'pointer';
+            headerEmoji.onclick = () => {
+                devClicks++;
+                
+                // Visual feedback
+                headerEmoji.style.transform = `scale(${1 + (devClicks * 0.1)})`;
+                setTimeout(() => headerEmoji.style.transform = '', 100);
+
+                if (devClickTimer) clearTimeout(devClickTimer);
+                devClickTimer = setTimeout(() => {
+                    devClicks = 0;
+                }, 2000);
+
+                if (devClicks >= 7) {
+                    const btn = document.getElementById('btn-dev-menu');
+                    if (btn.classList.contains('hidden')) {
+                        btn.classList.remove('hidden');
+                        showNotification("👨‍💻 Developer Mode Activated!");
+                        devClicks = 0;
+                    }
+                }
+            };
+        }
+
+        // --- Cheats ---
+        function cheatUnlock() {
+            // Unlocks all countries visually in selection across ALL regions
+            [CONFIG_GLOBAL, CONFIG_EAST_EU, CONFIG_NATO, CONFIG_EU].forEach(list => {
+                list.forEach(c => c.extended = false);
+            });
+            // Update current view
+            initSetup(false);
+            toggleDevModal();
+            showNotification("All countries in ALL regions unlocked!");
+        }
+
+        function cheatHealAll() {
+            if (!gameState.userPlayerId) return;
+            const p = getPlayer(gameState.userPlayerId);
+            if(p) { p.hp = 50; p.maxHp = 50; p.shield = 10; renderGame(); }
+            toggleDevModal();
+        }
+        
+        function cheatGodMode() {
+            if (!gameState.userPlayerId) return;
+            const p = getPlayer(gameState.userPlayerId);
+            if(p) { p.hp = 100; p.maxHp = 100; p.shield = 50; p.nukes += 10; p.nukeCd = 0; renderGame(); }
+            toggleDevModal();
+        }
+
+        function cheatSkipTurn() {
+             if (gameState.activePlayerId !== gameState.userPlayerId && gameState.activePlayerId !== gameState.secondPlayerId) return;
+             const alive = gameState.players.filter(p => p.isAlive && p.id !== gameState.activePlayerId);
+             if (alive.length > 0) {
+                 const randomNext = alive[Math.floor(Math.random() * alive.length)].id;
+                 endTurn(randomNext);
+             }
+             toggleDevModal();
+        }
+
+        function cheatNukes() {
+            if (!gameState.userPlayerId) return;
+            const p = getPlayer(gameState.userPlayerId);
+            if(p) { p.nukes += 5; p.nukeCd = 0; renderGame(); }
+            toggleDevModal();
+        }
+
+        function cheatKillAll() {
+            if (!gameState.userPlayerId) return;
+            gameState.players.forEach(p => {
+                if (p.id !== gameState.userPlayerId && p.isAlive) {
+                    p.hp = 1;
+                    p.shield = 0;
+                }
+            });
+            renderGame();
+            toggleDevModal();
+        }
+
+        function cheatInstantWin() {
+            if (!gameState.userPlayerId) return;
+            gameState.players.forEach(p => {
+                if (p.id !== gameState.userPlayerId) {
+                    p.hp = 0;
+                    p.isAlive = false;
+                    p.shield = 0;
+                }
+            });
+            renderGame();
+            checkWinCondition();
+            toggleDevModal();
+        }
+
+        function cheatReviveAll() {
+            gameState.players.forEach(p => {
+                if (!p.isAlive) {
+                    p.isAlive = true;
+                    p.hp = 5;
+                    p.shield = 0;
+                }
+            });
+            gameState.isGameOver = false;
+            document.getElementById('victory-modal').classList.add('hidden');
+            renderGame();
+            toggleDevModal();
+            // If the loop stopped, kickstart it
+            if (!gameState.activePlayerId || !getPlayer(gameState.activePlayerId).isAlive) {
+                const alive = gameState.players.filter(p => p.isAlive);
+                if (alive.length > 0) {
+                    gameState.activePlayerId = alive[0].id;
+                    processTurn();
+                }
+            }
+        }
+
+        function cheatInfiniteShield() {
+            if (!gameState.userPlayerId) return;
+            const p = getPlayer(gameState.userPlayerId);
+            if(p) { p.shield = 100; renderGame(); }
+            toggleDevModal();
+        }
+
+        function cheatForcePeace() {
+            if (!gameState.userPlayerId) return;
+            const user = getPlayer(gameState.userPlayerId);
+            gameState.players.forEach(p => {
+                if (p.id !== user.id && p.isAlive) {
+                    // Manually add alliance without log spam if possible, or just use helper
+                    if (!user.allies.includes(p.id)) user.allies.push(p.id);
+                    if (!p.allies.includes(user.id)) p.allies.push(user.id);
+                }
+            });
+            log("🕊️ Forced Global Peace!", 'system');
+            renderGame();
+            toggleDevModal();
+        }
+
+        function cheatForceWar() {
+            if (!gameState.userPlayerId) return;
+            const user = getPlayer(gameState.userPlayerId);
+            gameState.players.forEach(p => {
+                if (p.id !== user.id) {
+                     // Manually break
+                    if (user.allies.includes(p.id)) user.allies = user.allies.filter(id => id !== p.id);
+                    if (p.allies.includes(user.id)) p.allies = p.allies.filter(id => id !== user.id);
+                }
+            });
+            log("💔 Forced Global War!", 'system');
+            renderGame();
+            toggleDevModal();
+        }
+
+        function cheatRerollWeapon() {
+            if (!gameState.userPlayerId) return;
+            rollUserWeapon();
+            renderGame();
+            animateWeaponRoll(gameState.userCurrentWeapon);
+            toggleDevModal();
+        }
+
+        function cheatMeteorShower() {
+            if (!gameState.userPlayerId) return;
+            const user = getPlayer(gameState.userPlayerId);
+            gameState.players.forEach(p => {
+                if (p.id !== user.id && p.isAlive) {
+                    applyDamage(null, p, 3, 'attack');
+                    log(tLog('dmgTaken', getCountryName(p.id), 3), 'attack');
+                }
+            });
+            renderGame();
+            toggleDevModal();
+        }
+
+/**
+ * cheatLifeSteal:
+ *   Steals 2 HP from every player (except for the user).
+ *   Gives the stolen HP to the user and triggers a heal animation.
+ *   Logs a message indicating how much HP was stolen total.
+ *   Renders the game state and toggles the dev modal.
+ */
+        function cheatLifeSteal() {
+            if (!gameState.userPlayerId) return;
+            const user = getPlayer(gameState.userPlayerId);
+            if (!user.isAlive) return;
+            let totalStolen = 0;
+            gameState.players.forEach(p => {
+                if (p.id !== user.id && p.isAlive) {
+                    const dmg = 2;
+                    applyDamage(user, p, dmg, 'attack');
+                    totalStolen += dmg;
+                }
+            });
+            user.hp += totalStolen;
+            triggerAnimation(user.id, 'anim-heal');
+            log(`🧛 Life Steal! Stole ${totalStolen} HP total.`, 'heal');
+            renderGame();
+            toggleDevModal();
+        }
+
+        /**
+         * CheatTitanMode:
+         *   Sets the player's max HP to 500, current HP to 500, shield to 100, and sets the isTitan flag to true.
+         *   Logs a message indicating that Titan mode has been activated.
+         *   Renders the game state and toggles the dev modal.
+         */
+        function cheatTitanMode() {
+            if (!gameState.userPlayerId) return;
+            const p = getPlayer(gameState.userPlayerId);
+            if(p) { 
+                p.maxHp = 500; 
+                p.hp = 500; 
+                p.shield = 100;
+                p.isTitan = true; // Set persistent flag
+                log(tLog('roundStart', "TITAN MODE ACTIVATED"), 'system'); 
+            }
+            renderGame();
+            toggleDevModal();
+        }
+
+/**
+ * Resets the user's nuke cooldown to 0.
+ * 
+ * @returns {void}
+ */
+        function cheatNoCooldowns() {
+            if (!gameState.userPlayerId) return;
+            const p = getPlayer(gameState.userPlayerId);
+            if(p) { p.nukeCd = 0; }
+            log("🔥 Cooldowns Reset!", 'system');
+            renderGame();
+            toggleDevModal();
+        }
+
+
+/**
+ * Saves the user's current stats from the dev stats modal input fields to localStorage.
+ * Updates the stats UI with the new values.
+ * @returns {void}
+ */
+        function devSaveStats() {
+            const winsInput = document.getElementById('dev-stat-wins');
+            const lossesInput = document.getElementById('dev-stat-losses');
+            const totalInput = document.getElementById('dev-stat-total');
+            
+            if (winsInput && lossesInput && totalInput) {
+                gameState.playerStats.wins = parseInt(winsInput.value) || 0;
+                gameState.playerStats.losses = parseInt(lossesInput.value) || 0;
+                gameState.playerStats.totalGames = parseInt(totalInput.value) || 0;
+                
+                savePlayerStats();
+                updateStatsUI();
+                showNotification('✅ Статистика сохранена!');
+            }
+        }
+
+/**
+ * Loads the current player stats into the dev stats modal input fields.
+ * Updates the value of the input fields with the current player stats.
+ * @param {void} - No parameters are required.
+ */
+        function devLoadStatsToModal() {
+            const winsInput = document.getElementById('dev-stat-wins');
+            const lossesInput = document.getElementById('dev-stat-losses');
+            const totalInput = document.getElementById('dev-stat-total');
+            
+            if (winsInput && lossesInput && totalInput) {
+                winsInput.value = gameState.playerStats.wins || 0;
+                lossesInput.value = gameState.playerStats.losses || 0;
+                totalInput.value = gameState.playerStats.totalGames || 0;
+            }
+        }
+
+        initSetup(); 
+        window.addEventListener('load', () => {
+            initIntro();
+            setupHeaderEasterEgg();
+            updateToggleButtons(); // Initialize season button
+            loadPlayerStats(); // Load statistics on page load
+            loadStatsFromCloud(); // Try to sync from cloud
+
+            const savedLang = localStorage.getItem('fallofflags_language');
+            if (savedLang && TRANSLATIONS[savedLang]) {
+                languageChosen = true;
+                setLanguage(savedLang);
+                document.getElementById('language-selection').classList.add('hidden');
+                document.getElementById('setup-screen').classList.remove('hidden');
+                initSetup();
+            } else if (window.innerWidth > 768) {
+                // Desktop auto-select based on browser locale and skip language selector
+                const preferred = navigator.language && navigator.language.startsWith('ru') ? 'ru' : 'en';
+                languageChosen = true;
+                setLanguage(preferred);
+                localStorage.setItem('fallofflags_language', preferred);
+                document.getElementById('language-selection').classList.add('hidden');
+                document.getElementById('setup-screen').classList.remove('hidden');
+                initSetup();
+            } else {
+                document.getElementById('language-selection').classList.remove('hidden');
+                document.getElementById('setup-screen').classList.add('hidden');
+            }
+
+            const setVh = () => {
+                document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
+            };
+            setVh();
+            window.addEventListener('resize', setVh);
+        });
+    </script>
+</body>
+</html>
