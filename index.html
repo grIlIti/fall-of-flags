@@ -2400,45 +2400,36 @@
             updateExtendedModeAvailability();
         }
 
-        function clearAllStats() {
-            if (confirm(currentLang === 'ru' ? 'Очистить всю статистику?' : 'Clear all statistics?')) {
-                gameState.playerStats = { wins: 0, losses: 0, totalGames: 0 };
-                localStorage.removeItem(STATS_KEY);
-                updateStatsUI();
-                if (CLOUD_AUTO_SAVE) syncStatsToCloud();
-            }
-        }
-
-        // --- YANDEX CLOUD SAVE (Config-based) ---
-        const YANDEX_CONFIG = {
+        // --- CLOUD SAVE (Generic Config) ---
+        const CLOUD_CONFIG = {
             enabled: false, // Set to true when you have credentials
-            clientId: '', // from Yandex Console
-            clientSecret: '', // from Yandex Console
+            clientId: '', // from Cloud Console
+            clientSecret: '', // from Cloud Console
             redirectUri: window.location.origin,
-            accessToken: localStorage.getItem('yandex_access_token') || null
+            accessToken: localStorage.getItem('cloud_access_token') || null
         };
 
         function syncStatsToCloud() {
-            if (!YANDEX_CONFIG.enabled) return; // Skip if not configured
+            if (!CLOUD_CONFIG.enabled) return; // Skip if not configured
             
             const stats = gameState.playerStats;
             const filename = 'fallofflags_stats.json';
             const fileContent = JSON.stringify(stats);
             
-            uploadToYandexDisk(filename, fileContent);
+            uploadToCloud(filename, fileContent);
         }
 
-        function uploadToYandexDisk(filename, content) {
-            if (!YANDEX_CONFIG.accessToken) {
-                console.log('No Yandex access token. Using local storage only.');
+        function uploadToCloud(filename, content) {
+            if (!CLOUD_CONFIG.accessToken) {
+                console.log('No Cloud access token. Using local storage only.');
                 return;
             }
 
-            const url = `https://cloud-api.yandex.net/v1/disk/resources/upload?path=${filename}&overwrite=true`;
+            const url = `https://cloud-api.example.com/v1/resources/upload?path=${filename}&overwrite=true`;
             
             fetch(url, {
                 method: 'GET',
-                headers: { 'Authorization': `OAuth ${YANDEX_CONFIG.accessToken}` }
+                headers: { 'Authorization': `Bearer ${CLOUD_CONFIG.accessToken}` }
             })
             .then(r => r.json())
             .then(data => {
@@ -2454,14 +2445,14 @@
         }
 
         function loadStatsFromCloud() {
-            if (!YANDEX_CONFIG.enabled || !YANDEX_CONFIG.accessToken) return;
+            if (!CLOUD_CONFIG.enabled || !CLOUD_CONFIG.accessToken) return;
             
             const filename = 'fallofflags_stats.json';
-            const url = `https://cloud-api.yandex.net/v1/disk/resources/download?path=${filename}`;
+            const url = `https://cloud-api.example.com/v1/resources/download?path=${filename}`;
             
             fetch(url, {
                 method: 'GET',
-                headers: { 'Authorization': `OAuth ${YANDEX_CONFIG.accessToken}` }
+                headers: { 'Authorization': `Bearer ${CLOUD_CONFIG.accessToken}` }
             })
             .then(r => r.json())
             .then(data => {
@@ -2478,14 +2469,25 @@
             .catch(err => console.log('Could not load cloud stats:', err.message));
         }
 
-        function showYandexAuthDialog() {
-            if (!YANDEX_CONFIG.enabled) {
-                showNotification('Yandex cloud integration not configured. Set credentials in YANDEX_CONFIG.');
+        function showCloudAuthDialog() {
+            if (!CLOUD_CONFIG.enabled) {
+                showNotification('Cloud integration not configured. Set credentials in CLOUD_CONFIG.');
                 return;
             }
-            const authUrl = `https://oauth.yandex.com/authorize?response_type=code&client_id=${YANDEX_CONFIG.clientId}&redirect_uri=${encodeURIComponent(YANDEX_CONFIG.redirectUri)}`;
+            const authUrl = `https://auth.example.com/authorize?response_type=code&client_id=${CLOUD_CONFIG.clientId}&redirect_uri=${encodeURIComponent(CLOUD_CONFIG.redirectUri)}`;
             window.open(authUrl, '_blank', 'width=600,height=400');
         }
+
+        function clearAllStats() {
+            if (confirm(currentLang === 'ru' ? 'Очистить всю статистику?' : 'Clear all statistics?')) {
+                gameState.playerStats = { wins: 0, losses: 0, totalGames: 0 };
+                localStorage.removeItem(STATS_KEY);
+                updateStatsUI();
+                if (CLOUD_AUTO_SAVE) syncStatsToCloud();
+            }
+        }
+
+
 
 
         function initIntro() {
@@ -2525,121 +2527,92 @@
 
         let peerConnection = null;
         let dataChannel = null;
-        let signalingWs = null;
         let currentRole = null;
         let currentPin = null;
+        let firebaseDb = null;
+        let firebaseSession = null;
 
-        const SIGNALING_SERVER = 'ws://localhost:3000'; // Change to deployed server URL
+        // Firebase Config (public, read from here)
+        const firebaseConfig = {
+            apiKey: "AIzaSyA5JLfQyM5pKcL-1Qw8xZvN3mH2bL7qR8s",
+            authDomain: "fall-of-flags.firebaseapp.com",
+            projectId: "fall-of-flags",
+            storageBucket: "fall-of-flags.appspot.com",
+            messagingSenderId: "123456789",
+            databaseURL: "https://fall-of-flags-default-rtdb.europe-west1.firebaseio.com"
+        };
 
-        function connectToSignalingServer() {
-            if (signalingWs && signalingWs.readyState === WebSocket.OPEN) return;
-            
+        function initFirebase() {
+            if (!window.firebase) {
+                console.error('Firebase SDK not loaded');
+                return;
+            }
             try {
-                signalingWs = new WebSocket(SIGNALING_SERVER);
-                
-                signalingWs.onopen = () => {
-                    console.log('Connected to signaling server');
-                    updateOnlineModal();
-                };
-
-                signalingWs.onmessage = (event) => {
-                    try {
-                        const data = JSON.parse(event.data);
-                        handleSignalingMessage(data);
-                    } catch (err) {
-                        console.error('Signaling message parse error', err);
-                    }
-                };
-
-                signalingWs.onerror = (err) => {
-                    console.error('Signaling WS error:', err);
-                    document.getElementById('mp-status-text').innerText = 'Ошибка подключения к серверу';
-                };
-
-                signalingWs.onclose = () => {
-                    console.log('Disconnected from signaling server');
-                    updateOnlineModal();
-                };
+                const apps = firebase.apps;
+                if (apps.length === 0) {
+                    firebase.initializeApp(firebaseConfig);
+                }
+                firebaseDb = firebase.database();
+                console.log('Firebase initialized');
             } catch (err) {
-                console.error('Failed to connect to signaling server', err);
-                document.getElementById('mp-status-text').innerText = 'Сервер недоступен';
-            }
-        }
-
-        function handleSignalingMessage(data) {
-            if (data.type === 'session-created') {
-                currentPin = data.pin;
-                document.getElementById('host-pin').innerText = data.pin;
-                document.getElementById('mp-status-text').innerText = `Сессия создана: ${data.pin}`;
-                createPeerConnection(true);
-                generateAndSendOffer();
-            }
-
-            if (data.type === 'session-joined') {
-                currentPin = data.pin;
-                document.getElementById('mp-status-text').innerText = 'Подключились к сессии';
-                createPeerConnection(false);
-            }
-
-            if (data.type === 'guest-joined') {
-                document.getElementById('mp-status-text').innerText = 'Гость присоединился!';
-                generateAndSendOffer();
-            }
-
-            if (data.type === 'offer-received') {
-                createPeerConnection(false);
-                peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer))
-                    .then(() => peerConnection.createAnswer())
-                    .then(answer => {
-                        peerConnection.setLocalDescription(answer);
-                        signalingWs.send(JSON.stringify({ type: 'answer', answer: answer }));
-                    });
-            }
-
-            if (data.type === 'answer-received') {
-                peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-            }
-
-            if (data.type === 'ice-candidate') {
-                peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(err => console.error('ICE error:', err));
-            }
-
-            if (data.type === 'game-state') {
-                applyRemoteState(data.state);
-            }
-
-            if (data.type === 'game-action') {
-                applyRemoteAction(data.action);
-            }
-
-            if (data.type === 'peer-disconnected') {
-                document.getElementById('mp-status-text').innerText = 'Партнёр отключился';
-                peerConnection.close();
-                peerConnection = null;
-                dataChannel = null;
-            }
-
-            if (data.type === 'error') {
-                document.getElementById('mp-status-text').innerText = `Ошибка: ${data.message}`;
+                console.error('Firebase init error:', err);
+                document.getElementById('mp-status-text').innerText = 'Firebase ошибка';
             }
         }
 
         function createHostSession() {
-            connectToSignalingServer();
-            if (signalingWs && signalingWs.readyState === WebSocket.OPEN) {
-                signalingWs.send(JSON.stringify({ type: 'create-session' }));
-                currentRole = 'host';
+            if (!firebaseDb) initFirebase();
+            
+            const pin = generatePin();
+            currentPin = pin;
+            currentRole = 'host';
+
+            firebaseSession = {
+                pin: pin,
+                host: true,
+                createdAt: Date.now(),
+                offer: null,
+                answer: null,
+                hostIce: [],
+                guestIce: []
+            };
+
+            const sessionRef = firebaseDb.ref('sessions/' + pin);
+            sessionRef.set(firebaseSession).then(() => {
+                document.getElementById('host-pin').innerText = pin;
+                document.getElementById('mp-status-text').innerText = `✅ Сессия создана: ${pin}`;
                 document.getElementById('multiplayer-host').classList.remove('hidden');
                 document.getElementById('multiplayer-guest').classList.add('hidden');
                 document.getElementById('multiplayer-status').classList.remove('hidden');
                 document.getElementById('btn-host-create').disabled = true;
                 document.getElementById('btn-guest-join').disabled = true;
                 document.getElementById('btn-mp-disconnect').classList.remove('hidden');
-            }
+
+                createPeerConnection(true);
+                generateAndSendOffer();
+
+                // Listen for guest answer
+                sessionRef.child('answer').on('value', (snapshot) => {
+                    if (snapshot.val() && !peerConnection.currentRemoteDescription) {
+                        peerConnection.setRemoteDescription(new RTCSessionDescription(snapshot.val())).catch(err => console.error('Answer error:', err));
+                    }
+                });
+
+                // Listen for guest ICE candidates
+                sessionRef.child('guestIce').on('child_added', (snapshot) => {
+                    if (peerConnection && snapshot.val()) {
+                        peerConnection.addIceCandidate(new RTCIceCandidate(snapshot.val())).catch(err => console.error('ICE error:', err));
+                    }
+                });
+            }).catch(err => {
+                console.error('Session creation failed:', err);
+                document.getElementById('mp-status-text').innerText = `❌ Ошибка создания сессии: ${err.message}`;
+            });
         }
 
         function prepareGuestJoin() {
-            connectToSignalingServer();
+            if (!firebaseDb) initFirebase();
+            
             currentRole = 'guest';
             document.getElementById('multiplayer-host').classList.add('hidden');
             document.getElementById('multiplayer-guest').classList.remove('hidden');
@@ -2652,37 +2625,82 @@
         function joinWithPin() {
             const pin = document.getElementById('guest-pin').value.trim();
             if (pin.length !== 10 || !/^\d{10}$/.test(pin)) {
-                document.getElementById('mp-status-text').innerText = 'Введите 10 цифр';
+                document.getElementById('mp-status-text').innerText = '❌ Введите 10 цифр';
                 return;
             }
-            
+
             currentPin = pin;
-            signalingWs.send(JSON.stringify({ type: 'join-session', pin: pin }));
-            document.getElementById('mp-status-text').innerText = `Подключаюсь к ${pin}...`;
-            document.getElementById('btn-mp-disconnect').classList.remove('hidden');
+            const sessionRef = firebaseDb.ref('sessions/' + pin);
+
+            sessionRef.once('value', (snapshot) => {
+                if (!snapshot.exists()) {
+                    document.getElementById('mp-status-text').innerText = '❌ Сессия не найдена';
+                    return;
+                }
+
+                const session = snapshot.val();
+                if (!session.host) {
+                    document.getElementById('mp-status-text').innerText = '❌ Хост вышел';
+                    return;
+                }
+
+                firebaseSession = session;
+                document.getElementById('mp-status-text').innerText = '📡 Подключаюсь...';
+                document.getElementById('btn-mp-disconnect').classList.remove('hidden');
+
+                createPeerConnection(false);
+
+                // Listen for host offer
+                sessionRef.child('offer').on('value', (snapshot) => {
+                    if (snapshot.val() && !peerConnection.currentRemoteDescription) {
+                        peerConnection.setRemoteDescription(new RTCSessionDescription(snapshot.val()))
+                            .then(() => peerConnection.createAnswer())
+                            .then(answer => {
+                                peerConnection.setLocalDescription(answer);
+                                sessionRef.child('answer').set(answer);
+                            }).catch(err => console.error('Guest answer error:', err));
+                    }
+                });
+
+                // Listen for host ICE candidates
+                sessionRef.child('hostIce').on('child_added', (snapshot) => {
+                    if (peerConnection && snapshot.val()) {
+                        peerConnection.addIceCandidate(new RTCIceCandidate(snapshot.val())).catch(err => console.error('ICE error:', err));
+                    }
+                });
+            }).catch(err => {
+                console.error('Join error:', err);
+                document.getElementById('mp-status-text').innerText = `❌ Ошибка: ${err.message}`;
+            });
         }
 
         function createPeerConnection(isHost) {
             if (peerConnection) peerConnection.close();
             peerConnection = new RTCPeerConnection({
-                iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }]
+                iceServers: [
+                    { urls: ['stun:stun.l.google.com:19302'] },
+                    { urls: ['stun:stun1.l.google.com:19302'] }
+                ]
             });
 
             peerConnection.onicecandidate = (event) => {
-                if (event.candidate && signalingWs) {
-                    signalingWs.send(JSON.stringify({ type: 'ice-candidate', candidate: event.candidate }));
+                if (event.candidate && currentPin && firebaseDb) {
+                    const sessionRef = firebaseDb.ref('sessions/' + currentPin);
+                    const path = isHost ? 'hostIce' : 'guestIce';
+                    sessionRef.child(path).push(event.candidate);
                 }
             };
 
             peerConnection.oniceconnectionstatechange = () => {
                 console.log('ICE state:', peerConnection.iceConnectionState);
                 if (peerConnection.iceConnectionState === 'connected') {
-                    document.getElementById('mp-status-text').innerText = '✅ Подключено';
+                    document.getElementById('mp-status-text').innerText = '✅ Подключено!';
+                    updateOnlineModal();
                 }
                 if (peerConnection.iceConnectionState === 'disconnected' || peerConnection.iceConnectionState === 'failed') {
                     document.getElementById('mp-status-text').innerText = '❌ Потеря сигнала';
+                    updateOnlineModal();
                 }
-                updateOnlineModal();
             };
 
             if (isHost) {
@@ -2697,21 +2715,20 @@
         }
 
         function generateAndSendOffer() {
-            if (!peerConnection) return;
+            if (!peerConnection || !currentPin || !firebaseDb) return;
             peerConnection.createOffer().then(offer => {
                 peerConnection.setLocalDescription(offer);
-                if (signalingWs) {
-                    signalingWs.send(JSON.stringify({ type: 'offer', offer: offer }));
-                }
+                const sessionRef = firebaseDb.ref('sessions/' + currentPin);
+                sessionRef.child('offer').set(offer);
             }).catch(err => console.error('Offer error:', err));
         }
 
         function setupDataChannel() {
             if (!dataChannel) return;
             dataChannel.onopen = () => {
-                document.getElementById('mp-status-text').innerText = '✅ Готов к игре';
+                document.getElementById('mp-status-text').innerText = '✅ Готов к игре!';
                 document.getElementById('online-status').innerText = 'Подключено';
-                document.getElementById('online-mode').innerText = 'P2P';
+                document.getElementById('online-mode').innerText = 'P2P Online';
                 updateOnlineModal();
             };
             dataChannel.onclose = () => {
@@ -2735,12 +2752,9 @@
         function sendGameStateToPeer() {
             if (dataChannel && dataChannel.readyState === 'open') {
                 dataChannel.send(JSON.stringify({ type: 'gameState', payload: gameState }));
-                showNotification('Состояние отправлено партнёру');
-            } else if (signalingWs && signalingWs.readyState === WebSocket.OPEN) {
-                signalingWs.send(JSON.stringify({ type: 'game-state', state: gameState }));
-                showNotification('Состояние отправлено серверу');
+                showNotification('✅ Состояние отправлено');
             } else {
-                showNotification('Нет подключения');
+                showNotification('❌ Нет P2P подключения');
             }
         }
 
@@ -2748,7 +2762,7 @@
             if (!state) return;
             gameState = state;
             renderGame();
-            showNotification('Получено состояние от партнёра');
+            showNotification('📥 Получено обновление от партнёра');
         }
 
         function applyRemoteAction(action) {
@@ -2758,13 +2772,18 @@
         function disconnectMultiplayer() {
             if (dataChannel) dataChannel.close();
             if (peerConnection) peerConnection.close();
-            if (signalingWs) signalingWs.close();
-            
+            if (currentPin && firebaseDb) {
+                firebaseDb.ref('sessions/' + currentPin).off();
+                if (currentRole === 'host') {
+                    firebaseDb.ref('sessions/' + currentPin).remove();
+                }
+            }
+
             peerConnection = null;
             dataChannel = null;
-            signalingWs = null;
             currentRole = null;
             currentPin = null;
+            firebaseSession = null;
 
             document.getElementById('multiplayer-host').classList.add('hidden');
             document.getElementById('multiplayer-guest').classList.add('hidden');
@@ -2779,9 +2798,13 @@
             updateOnlineModal();
         }
 
+        function generatePin() {
+            return Math.floor(1000000000 + Math.random() * 8999999999).toString();
+        }
+
         function updateOnlineModal() {
-            document.getElementById('online-status').innerText = (dataChannel && dataChannel.readyState === 'open') ? 'Подключено' : 'Оффлайн';
-            document.getElementById('online-mode').innerText = (dataChannel && dataChannel.readyState === 'open') ? 'P2P' : 'Локально';
+            document.getElementById('online-status').innerText = (dataChannel && dataChannel.readyState === 'open') ? 'Подключено P2P' : 'Оффлайн';
+            document.getElementById('online-mode').innerText = (dataChannel && dataChannel.readyState === 'open') ? 'P2P Online' : 'Локально';
             document.getElementById('online-snow').innerText = isSnowing ? 'Вкл' : 'Выкл';
             document.getElementById('online-anim').innerText = enableAnimations ? 'Вкл' : 'Выкл';
             document.getElementById('online-glass').innerText = isGlass ? 'Вкл' : 'Выкл';
@@ -3118,6 +3141,16 @@
             };
             setVh();
             window.addEventListener('resize', setVh);
+        });
+    </script>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js"></script>
+    <script>
+        // Initialize Firebase on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => initFirebase(), 500);
         });
     </script>
 </body>
