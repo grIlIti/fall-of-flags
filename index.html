@@ -512,17 +512,33 @@
             </div>
 
             <div class="mt-4 border-t border-gray-700 pt-4">
-                <h3 class="text-sm text-gray-300 font-bold mb-2">P2P Multiplayer</h3>
-                <div class="grid gap-2 text-xs">
-                    <button id="btn-create-offer" onclick="setupMultiplayer('host')" class="px-3 py-2 rounded bg-green-600 hover:bg-green-500 text-white">Создать сессию (Host)</button>
-                    <button id="btn-join-offer" onclick="setupMultiplayer('guest')" class="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white">Подключиться как гость</button>
-                    <textarea id="p2p-offer" rows="5" readonly class="w-full bg-gray-900 text-green-200 p-2 rounded border border-gray-600"></textarea>
-                    <textarea id="p2p-answer" rows="5" readonly class="w-full bg-gray-900 text-blue-200 p-2 rounded border border-gray-600"></textarea>
-                    <textarea id="p2p-remote" rows="5" placeholder="Вставьте SDP от партнёра" class="w-full bg-gray-900 text-gray-200 p-2 rounded border border-gray-600"></textarea>
-                    <div class="grid grid-cols-2 gap-2">
-                        <button onclick="applyRemoteSdp('offer')" class="px-3 py-2 rounded bg-gray-700 hover:bg-gray-600 text-white">Применить offer</button>
-                        <button onclick="applyRemoteSdp('answer')" class="px-3 py-2 rounded bg-gray-700 hover:bg-gray-600 text-white">Применить answer</button>
+                <h3 class="text-sm text-gray-300 font-bold mb-3">🔗 Быстрое подключение (10 цифр)</h3>
+                <div class="grid gap-3 text-xs">
+                    <div id="multiplayer-host" class="hidden">
+                        <div class="bg-green-900/30 border border-green-500 p-3 rounded mb-3">
+                            <p class="text-green-300 font-bold mb-2">✅ Хост режим активен</p>
+                            <p class="text-green-200 text-lg font-mono" id="host-pin">0000000000</p>
+                            <p class="text-green-400 text-[10px] mt-1">Поделитесь кодом с другом</p>
+                        </div>
                     </div>
+                    
+                    <div id="multiplayer-guest" class="hidden">
+                        <div class="flex gap-2 mb-2">
+                            <input id="guest-pin" type="text" maxlength="10" placeholder="Введите 10 цифр" class="flex-1 bg-gray-900 text-white p-2 rounded border border-gray-600 font-mono text-lg tracking-widest">
+                            <button onclick="joinWithPin()" class="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-bold">OK</button>
+                        </div>
+                    </div>
+
+                    <div id="multiplayer-status" class="hidden bg-gray-900/50 p-2 rounded border border-gray-600 text-gray-300">
+                        <p id="mp-status-text">Подключение...</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="createHostSession()" id="btn-host-create" class="px-3 py-2 rounded bg-green-600 hover:bg-green-500 text-white font-bold">🏠 Хост</button>
+                        <button onclick="prepareGuestJoin()" id="btn-guest-join" class="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-bold">👥 Гость</button>
+                    </div>
+                    
+                    <button onclick="disconnectMultiplayer()" id="btn-mp-disconnect" class="hidden px-3 py-2 rounded bg-red-600 hover:bg-red-500 text-white text-xs font-bold w-full">Отключить</button>
                 </div>
             </div>
 
@@ -2509,60 +2525,198 @@
 
         let peerConnection = null;
         let dataChannel = null;
+        let signalingWs = null;
+        let currentRole = null;
+        let currentPin = null;
 
-        function updateOnlineModal() {
-            document.getElementById('online-status').innerText = (dataChannel && dataChannel.readyState === 'open') ? 'Подключено' : 'Оффлайн';
-            document.getElementById('online-mode').innerText = peerConnection ? 'P2P' : 'Локально';
-            document.getElementById('online-snow').innerText = isSnowing ? 'Вкл' : 'Выкл';
-            document.getElementById('online-anim').innerText = enableAnimations ? 'Вкл' : 'Выкл';
-            document.getElementById('online-glass').innerText = isGlass ? 'Вкл' : 'Выкл';
-            document.getElementById('online-difficulty').innerText = aiDifficulty ? aiDifficulty.toUpperCase() : 'NORMAL';
-            document.getElementById('online-lang').innerText = currentLang ? currentLang.toUpperCase() : 'RU';
+        const SIGNALING_SERVER = 'ws://localhost:3000'; // Change to deployed server URL
+
+        function connectToSignalingServer() {
+            if (signalingWs && signalingWs.readyState === WebSocket.OPEN) return;
+            
+            try {
+                signalingWs = new WebSocket(SIGNALING_SERVER);
+                
+                signalingWs.onopen = () => {
+                    console.log('Connected to signaling server');
+                    updateOnlineModal();
+                };
+
+                signalingWs.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleSignalingMessage(data);
+                    } catch (err) {
+                        console.error('Signaling message parse error', err);
+                    }
+                };
+
+                signalingWs.onerror = (err) => {
+                    console.error('Signaling WS error:', err);
+                    document.getElementById('mp-status-text').innerText = 'Ошибка подключения к серверу';
+                };
+
+                signalingWs.onclose = () => {
+                    console.log('Disconnected from signaling server');
+                    updateOnlineModal();
+                };
+            } catch (err) {
+                console.error('Failed to connect to signaling server', err);
+                document.getElementById('mp-status-text').innerText = 'Сервер недоступен';
+            }
         }
 
-        function setupMultiplayer(role) {
-            createPeerConnection();
-            if (role === 'host') {
+        function handleSignalingMessage(data) {
+            if (data.type === 'session-created') {
+                currentPin = data.pin;
+                document.getElementById('host-pin').innerText = data.pin;
+                document.getElementById('mp-status-text').innerText = `Сессия создана: ${data.pin}`;
+                createPeerConnection(true);
+                generateAndSendOffer();
+            }
+
+            if (data.type === 'session-joined') {
+                currentPin = data.pin;
+                document.getElementById('mp-status-text').innerText = 'Подключились к сессии';
+                createPeerConnection(false);
+            }
+
+            if (data.type === 'guest-joined') {
+                document.getElementById('mp-status-text').innerText = 'Гость присоединился!';
+                generateAndSendOffer();
+            }
+
+            if (data.type === 'offer-received') {
+                createPeerConnection(false);
+                peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer))
+                    .then(() => peerConnection.createAnswer())
+                    .then(answer => {
+                        peerConnection.setLocalDescription(answer);
+                        signalingWs.send(JSON.stringify({ type: 'answer', answer: answer }));
+                    });
+            }
+
+            if (data.type === 'answer-received') {
+                peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+            }
+
+            if (data.type === 'ice-candidate') {
+                peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(err => console.error('ICE error:', err));
+            }
+
+            if (data.type === 'game-state') {
+                applyRemoteState(data.state);
+            }
+
+            if (data.type === 'game-action') {
+                applyRemoteAction(data.action);
+            }
+
+            if (data.type === 'peer-disconnected') {
+                document.getElementById('mp-status-text').innerText = 'Партнёр отключился';
+                peerConnection.close();
+                peerConnection = null;
+                dataChannel = null;
+            }
+
+            if (data.type === 'error') {
+                document.getElementById('mp-status-text').innerText = `Ошибка: ${data.message}`;
+            }
+        }
+
+        function createHostSession() {
+            connectToSignalingServer();
+            if (signalingWs && signalingWs.readyState === WebSocket.OPEN) {
+                signalingWs.send(JSON.stringify({ type: 'create-session' }));
+                currentRole = 'host';
+                document.getElementById('multiplayer-host').classList.remove('hidden');
+                document.getElementById('multiplayer-guest').classList.add('hidden');
+                document.getElementById('multiplayer-status').classList.remove('hidden');
+                document.getElementById('btn-host-create').disabled = true;
+                document.getElementById('btn-guest-join').disabled = true;
+                document.getElementById('btn-mp-disconnect').classList.remove('hidden');
+            }
+        }
+
+        function prepareGuestJoin() {
+            connectToSignalingServer();
+            currentRole = 'guest';
+            document.getElementById('multiplayer-host').classList.add('hidden');
+            document.getElementById('multiplayer-guest').classList.remove('hidden');
+            document.getElementById('multiplayer-status').classList.remove('hidden');
+            document.getElementById('btn-host-create').disabled = true;
+            document.getElementById('btn-guest-join').disabled = true;
+            document.getElementById('mp-status-text').innerText = 'Введите 10-значный код';
+        }
+
+        function joinWithPin() {
+            const pin = document.getElementById('guest-pin').value.trim();
+            if (pin.length !== 10 || !/^\d{10}$/.test(pin)) {
+                document.getElementById('mp-status-text').innerText = 'Введите 10 цифр';
+                return;
+            }
+            
+            currentPin = pin;
+            signalingWs.send(JSON.stringify({ type: 'join-session', pin: pin }));
+            document.getElementById('mp-status-text').innerText = `Подключаюсь к ${pin}...`;
+            document.getElementById('btn-mp-disconnect').classList.remove('hidden');
+        }
+
+        function createPeerConnection(isHost) {
+            if (peerConnection) peerConnection.close();
+            peerConnection = new RTCPeerConnection({
+                iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }]
+            });
+
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate && signalingWs) {
+                    signalingWs.send(JSON.stringify({ type: 'ice-candidate', candidate: event.candidate }));
+                }
+            };
+
+            peerConnection.oniceconnectionstatechange = () => {
+                console.log('ICE state:', peerConnection.iceConnectionState);
+                if (peerConnection.iceConnectionState === 'connected') {
+                    document.getElementById('mp-status-text').innerText = '✅ Подключено';
+                }
+                if (peerConnection.iceConnectionState === 'disconnected' || peerConnection.iceConnectionState === 'failed') {
+                    document.getElementById('mp-status-text').innerText = '❌ Потеря сигнала';
+                }
+                updateOnlineModal();
+            };
+
+            if (isHost) {
                 dataChannel = peerConnection.createDataChannel('game');
                 setupDataChannel();
-                peerConnection.createOffer().then(offer => peerConnection.setLocalDescription(offer)).then(() => {
-                    document.getElementById('p2p-offer').value = JSON.stringify(peerConnection.localDescription);
-                    document.getElementById('online-status').innerText = 'Offer готов';
-                });
             } else {
                 peerConnection.ondatachannel = (event) => {
                     dataChannel = event.channel;
                     setupDataChannel();
                 };
-                document.getElementById('online-status').innerText = 'Гость: ожидает offer';
             }
         }
 
-        function createPeerConnection() {
-            if (peerConnection) peerConnection.close();
-            peerConnection = new RTCPeerConnection();
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) return;
-                if (peerConnection.localDescription) {
-                    if (peerConnection.localDescription.type === 'offer') {
-                        document.getElementById('p2p-offer').value = JSON.stringify(peerConnection.localDescription);
-                    } else if (peerConnection.localDescription.type === 'answer') {
-                        document.getElementById('p2p-answer').value = JSON.stringify(peerConnection.localDescription);
-                    }
+        function generateAndSendOffer() {
+            if (!peerConnection) return;
+            peerConnection.createOffer().then(offer => {
+                peerConnection.setLocalDescription(offer);
+                if (signalingWs) {
+                    signalingWs.send(JSON.stringify({ type: 'offer', offer: offer }));
                 }
-            };
-            peerConnection.onconnectionstatechange = updateOnlineModal;
-            peerConnection.oniceconnectionstatechange = updateOnlineModal;
+            }).catch(err => console.error('Offer error:', err));
         }
 
         function setupDataChannel() {
             if (!dataChannel) return;
             dataChannel.onopen = () => {
+                document.getElementById('mp-status-text').innerText = '✅ Готов к игре';
                 document.getElementById('online-status').innerText = 'Подключено';
+                document.getElementById('online-mode').innerText = 'P2P';
                 updateOnlineModal();
             };
             dataChannel.onclose = () => {
                 document.getElementById('online-status').innerText = 'Отключено';
+                document.getElementById('online-mode').innerText = 'Локально';
                 updateOnlineModal();
             };
             dataChannel.onmessage = (event) => {
@@ -2573,52 +2727,74 @@
                     } else if (data.type === 'action') {
                         applyRemoteAction(data.payload);
                     }
-                } catch (err) { console.error('P2P message parse error', err); }
+                } catch (err) { console.error('DataChannel message parse error', err); }
             };
             updateOnlineModal();
-        }
-
-        function applyRemoteSdp(kind) {
-            const textarea = document.getElementById('p2p-remote');
-            if (!textarea) return;
-            try {
-                const desc = JSON.parse(textarea.value);
-                if (kind === 'offer') {
-                    peerConnection.setRemoteDescription(desc).then(() => peerConnection.createAnswer()).then(answer => peerConnection.setLocalDescription(answer)).then(() => {
-                        document.getElementById('p2p-answer').value = JSON.stringify(peerConnection.localDescription);
-                        document.getElementById('online-status').innerText = 'Answer готов';
-                        updateOnlineModal();
-                    });
-                } else if (kind === 'answer') {
-                    peerConnection.setRemoteDescription(desc).then(() => {
-                        document.getElementById('online-status').innerText = 'Подключено';
-                        updateOnlineModal();
-                    });
-                }
-            } catch (err) {
-                console.error('Ошибка SDP', err);
-            }
         }
 
         function sendGameStateToPeer() {
             if (dataChannel && dataChannel.readyState === 'open') {
                 dataChannel.send(JSON.stringify({ type: 'gameState', payload: gameState }));
+                showNotification('Состояние отправлено партнёру');
+            } else if (signalingWs && signalingWs.readyState === WebSocket.OPEN) {
+                signalingWs.send(JSON.stringify({ type: 'game-state', state: gameState }));
+                showNotification('Состояние отправлено серверу');
             } else {
-                showNotification('No P2P connection open');
+                showNotification('Нет подключения');
             }
         }
 
         function applyRemoteState(state) {
             if (!state) return;
-            // Simple state merge: переопределяем текущее состояние (можно доработать)
             gameState = state;
             renderGame();
             showNotification('Получено состояние от партнёра');
         }
 
         function applyRemoteAction(action) {
-            // Для продвинутого синхрона (в будущем) можно применять одиночные ходы
             console.log('Remote action', action);
+        }
+
+        function disconnectMultiplayer() {
+            if (dataChannel) dataChannel.close();
+            if (peerConnection) peerConnection.close();
+            if (signalingWs) signalingWs.close();
+            
+            peerConnection = null;
+            dataChannel = null;
+            signalingWs = null;
+            currentRole = null;
+            currentPin = null;
+
+            document.getElementById('multiplayer-host').classList.add('hidden');
+            document.getElementById('multiplayer-guest').classList.add('hidden');
+            document.getElementById('multiplayer-status').classList.add('hidden');
+            document.getElementById('btn-host-create').disabled = false;
+            document.getElementById('btn-guest-join').disabled = false;
+            document.getElementById('btn-mp-disconnect').classList.add('hidden');
+            document.getElementById('guest-pin').value = '';
+
+            document.getElementById('online-status').innerText = 'Оффлайн';
+            document.getElementById('online-mode').innerText = 'Локально';
+            updateOnlineModal();
+        }
+
+        function updateOnlineModal() {
+            document.getElementById('online-status').innerText = (dataChannel && dataChannel.readyState === 'open') ? 'Подключено' : 'Оффлайн';
+            document.getElementById('online-mode').innerText = (dataChannel && dataChannel.readyState === 'open') ? 'P2P' : 'Локально';
+            document.getElementById('online-snow').innerText = isSnowing ? 'Вкл' : 'Выкл';
+            document.getElementById('online-anim').innerText = enableAnimations ? 'Вкл' : 'Выкл';
+            document.getElementById('online-glass').innerText = isGlass ? 'Вкл' : 'Выкл';
+            document.getElementById('online-difficulty').innerText = aiDifficulty ? aiDifficulty.toUpperCase() : 'NORMAL';
+            document.getElementById('online-lang').innerText = currentLang ? currentLang.toUpperCase() : 'RU';
+        }
+
+        function toggleOnlineModal() {
+            const modal = document.getElementById('online-modal');
+            modal.classList.toggle('hidden');
+            if (!modal.classList.contains('hidden')) {
+                updateOnlineModal();
+            }
         }
 
         function toggleDevModal() {
