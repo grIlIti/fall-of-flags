@@ -1,0 +1,19 @@
+{
+  "name": "fall-of-flags-server",
+  "version": "0.3.1",
+  "description": "WebRTC Signaling Server for Fall of Flags multiplayer",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["webrtc", "p2p", "game", "signaling"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.13.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
