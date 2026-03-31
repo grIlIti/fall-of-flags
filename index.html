@@ -201,10 +201,12 @@
     <!-- Intro Overlay -->
     <div id="intro-overlay" class="fixed inset-0 z-[100] bg-gray-900 flex flex-col items-center justify-center overflow-hidden transition-transform duration-1000 ease-in-out">
         <div id="intro-bg" class="absolute inset-0 grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 p-8 opacity-30 blur-[4px] pointer-events-none select-none grayscale-0 scale-105"></div>
-        <div class="relative z-10 text-center animate-in fade-in zoom-in duration-1000">
-            <div class="text-8xl md:text-9xl mb-6 animate-[pulse-emoji_2s_infinite] drop-shadow-[0_0_25px_rgba(59,130,246,0.6)]">🌏</div>
-            <h1 class="text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-500 to-indigo-500 drop-shadow-2xl mb-2 animate-gradient-text">Fall of Flags</h1>
-            <p class="text-xl md:text-3xl text-gray-400 font-bold tracking-[0.2em] uppercase drop-shadow-lg">Падение Флагов</p>
+        <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <div class="mb-4">
+                <h1 class="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-500 to-indigo-500 drop-shadow-2xl">Fall of Flags</h1>
+                <p class="text-lg md:text-xl text-gray-300 font-semibold tracking-[0.15em] uppercase drop-shadow-lg">Падение Флагов</p>
+            </div>
+            <img src="pictures/logo.png" alt="Logo" class="w-32 h-32 md:w-40 md:h-40 animate-[pulse-emoji_2s_infinite] drop-shadow-[0_0_25px_rgba(59,130,246,0.6)]">
         </div>
     </div>
 
@@ -219,6 +221,9 @@
         <div id="settings-dropdown" class="hidden bg-gray-800 border border-gray-700 p-3 rounded-lg shadow-xl flex flex-col gap-3 min-w-[120px] backdrop-blur-md">
             <button onclick="toggleSnow()" id="btn-snow" class="px-3 py-2 rounded border border-gray-600 hover:bg-gray-700 text-sm font-bold transition w-full flex items-center justify-center gap-2">
                 <span id="txt-snow">Snow</span> <span id="emoji-snow">❄️</span>
+            </button>
+            <button onclick="toggleOnlineModal()" id="btn-online" class="px-3 py-2 rounded border border-gray-600 hover:bg-gray-700 text-sm font-bold transition w-full flex items-center justify-center gap-2 bg-green-700 border-green-500">
+                <span>Online Info</span> 🌐
             </button>
             <button onclick="toggleAnimations()" id="btn-anim" class="px-3 py-2 rounded border border-gray-600 hover:bg-gray-700 text-sm font-bold transition w-full flex items-center justify-center gap-2 bg-blue-900 border-blue-500">
                 <span id="txt-anim">Anim: ON</span> 🎬
@@ -481,6 +486,51 @@
             <div class="mt-4 pt-4 border-t border-gray-800 text-[10px] text-gray-500 font-mono text-center">
                 Cheats disable achievements. Just kidding, there are no achievements.
             </div>
+        </div>
+    </div>
+
+    <!-- Online Settings Modal -->
+    <div id="online-modal" class="fixed inset-0 bg-black/85 flex items-center justify-center hidden z-[75] backdrop-blur-sm overflow-y-auto">
+        <div class="bg-gray-800 p-5 rounded-2xl border border-blue-500/50 max-w-md w-full m-4 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-cyan-300">🌐 Онлайн окно</h2>
+                <button onclick="toggleOnlineModal()" class="text-gray-300 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="space-y-2 text-sm text-gray-200">
+                <p><strong>Статус подключения:</strong> <span id="online-status">Оффлайн</span></p>
+                <p><strong>Режим:</strong> <span id="online-mode">Локально</span></p>
+                <p><strong>Snow:</strong> <span id="online-snow">-</span></p>
+                <p><strong>Анимации:</strong> <span id="online-anim">-</span></p>
+                <p><strong>Liquid Glass:</strong> <span id="online-glass">-</span></p>
+                <p><strong>Сложность:</strong> <span id="online-difficulty">-</span></p>
+                <p><strong>Язык:</strong> <span id="online-lang">-</span></p>
+            </div>
+            <div class="mt-4 border-t border-gray-700 pt-4 space-y-2">
+                <button onclick="toggleSnow(); updateOnlineModal();" class="px-3 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm">Переключить Snow</button>
+                <button onclick="toggleAnimations(); updateOnlineModal();" class="px-3 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm">Переключить Анимации</button>
+                <button onclick="toggleLiquidGlass(); updateOnlineModal();" class="px-3 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm">Переключить Liquid Glass</button>
+            </div>
+
+            <div class="mt-4 border-t border-gray-700 pt-4">
+                <h3 class="text-sm text-gray-300 font-bold mb-2">P2P Multiplayer</h3>
+                <div class="grid gap-2 text-xs">
+                    <button id="btn-create-offer" onclick="setupMultiplayer('host')" class="px-3 py-2 rounded bg-green-600 hover:bg-green-500 text-white">Создать сессию (Host)</button>
+                    <button id="btn-join-offer" onclick="setupMultiplayer('guest')" class="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white">Подключиться как гость</button>
+                    <textarea id="p2p-offer" rows="5" readonly class="w-full bg-gray-900 text-green-200 p-2 rounded border border-gray-600"></textarea>
+                    <textarea id="p2p-answer" rows="5" readonly class="w-full bg-gray-900 text-blue-200 p-2 rounded border border-gray-600"></textarea>
+                    <textarea id="p2p-remote" rows="5" placeholder="Вставьте SDP от партнёра" class="w-full bg-gray-900 text-gray-200 p-2 rounded border border-gray-600"></textarea>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="applyRemoteSdp('offer')" class="px-3 py-2 rounded bg-gray-700 hover:bg-gray-600 text-white">Применить offer</button>
+                        <button onclick="applyRemoteSdp('answer')" class="px-3 py-2 rounded bg-gray-700 hover:bg-gray-600 text-white">Применить answer</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 border-t border-gray-700 pt-4 flex justify-between gap-2">
+                <button onclick="toggleOnlineModal();" class="px-3 py-2 rounded bg-gray-700 hover:bg-gray-600 text-white text-sm">Закрыть</button>
+                <button onclick="sendGameStateToPeer();" class="px-3 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm">Отправить состояние</button>
+            </div>
+            <p class="text-xs text-gray-400 mt-3">Для игры между двумя устройствами: обменяйтесь SDP через чат. Открывайте этот сайт в двух браузерах.</p>
         </div>
     </div>
 
@@ -982,8 +1032,8 @@
         let aiDifficulty = 'normal';
         let snowInterval = null;
 
-        const GLOBE_ICON_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABQAAAAUACAYAAAAY5P/3AAAgAElEQVR4Aey9+ZMmx33ml1X1vm8fc+IakARJSASme8BDoo71akntwkQIAAAQIECBAgQIAAAQIECBAg0LaAALDt8dN7AgQIECBAgAABAgQIECBAgAABAisF/g/VloujswGnrAAAAABJRU5ErkJggg==";
-        const SNOW_ICON_SRC = GLOBE_ICON_SRC;
+        const GLOBE_ICON_SRC = "pictures/logo.png";
+        const SNOW_ICON_SRC = "pictures/logo.png";
 
         function toggleSettings() { document.getElementById('settings-dropdown').classList.toggle('hidden'); }
 
@@ -2447,6 +2497,128 @@
                 setTimeout(() => { p.remove(); toEl.classList.add('scale-90', 'bg-red-900/50', 'border-red-500'); setTimeout(() => toEl.classList.remove('scale-90', 'bg-red-900/50', 'border-red-500'), 200); }, 700);
             }, 600);
             setTimeout(() => { clearInterval(interval); document.getElementById('intro-overlay').style.transform = 'translateY(-100vh)'; setTimeout(() => { const overlay = document.getElementById('intro-overlay'); if(overlay) overlay.remove(); }, 1000); }, 6000);
+        }
+
+        function toggleOnlineModal() {
+            const modal = document.getElementById('online-modal');
+            modal.classList.toggle('hidden');
+            if (!modal.classList.contains('hidden')) {
+                updateOnlineModal();
+            }
+        }
+
+        let peerConnection = null;
+        let dataChannel = null;
+
+        function updateOnlineModal() {
+            document.getElementById('online-status').innerText = (dataChannel && dataChannel.readyState === 'open') ? 'Подключено' : 'Оффлайн';
+            document.getElementById('online-mode').innerText = peerConnection ? 'P2P' : 'Локально';
+            document.getElementById('online-snow').innerText = isSnowing ? 'Вкл' : 'Выкл';
+            document.getElementById('online-anim').innerText = enableAnimations ? 'Вкл' : 'Выкл';
+            document.getElementById('online-glass').innerText = isGlass ? 'Вкл' : 'Выкл';
+            document.getElementById('online-difficulty').innerText = aiDifficulty ? aiDifficulty.toUpperCase() : 'NORMAL';
+            document.getElementById('online-lang').innerText = currentLang ? currentLang.toUpperCase() : 'RU';
+        }
+
+        function setupMultiplayer(role) {
+            createPeerConnection();
+            if (role === 'host') {
+                dataChannel = peerConnection.createDataChannel('game');
+                setupDataChannel();
+                peerConnection.createOffer().then(offer => peerConnection.setLocalDescription(offer)).then(() => {
+                    document.getElementById('p2p-offer').value = JSON.stringify(peerConnection.localDescription);
+                    document.getElementById('online-status').innerText = 'Offer готов';
+                });
+            } else {
+                peerConnection.ondatachannel = (event) => {
+                    dataChannel = event.channel;
+                    setupDataChannel();
+                };
+                document.getElementById('online-status').innerText = 'Гость: ожидает offer';
+            }
+        }
+
+        function createPeerConnection() {
+            if (peerConnection) peerConnection.close();
+            peerConnection = new RTCPeerConnection();
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) return;
+                if (peerConnection.localDescription) {
+                    if (peerConnection.localDescription.type === 'offer') {
+                        document.getElementById('p2p-offer').value = JSON.stringify(peerConnection.localDescription);
+                    } else if (peerConnection.localDescription.type === 'answer') {
+                        document.getElementById('p2p-answer').value = JSON.stringify(peerConnection.localDescription);
+                    }
+                }
+            };
+            peerConnection.onconnectionstatechange = updateOnlineModal;
+            peerConnection.oniceconnectionstatechange = updateOnlineModal;
+        }
+
+        function setupDataChannel() {
+            if (!dataChannel) return;
+            dataChannel.onopen = () => {
+                document.getElementById('online-status').innerText = 'Подключено';
+                updateOnlineModal();
+            };
+            dataChannel.onclose = () => {
+                document.getElementById('online-status').innerText = 'Отключено';
+                updateOnlineModal();
+            };
+            dataChannel.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'gameState') {
+                        applyRemoteState(data.payload);
+                    } else if (data.type === 'action') {
+                        applyRemoteAction(data.payload);
+                    }
+                } catch (err) { console.error('P2P message parse error', err); }
+            };
+            updateOnlineModal();
+        }
+
+        function applyRemoteSdp(kind) {
+            const textarea = document.getElementById('p2p-remote');
+            if (!textarea) return;
+            try {
+                const desc = JSON.parse(textarea.value);
+                if (kind === 'offer') {
+                    peerConnection.setRemoteDescription(desc).then(() => peerConnection.createAnswer()).then(answer => peerConnection.setLocalDescription(answer)).then(() => {
+                        document.getElementById('p2p-answer').value = JSON.stringify(peerConnection.localDescription);
+                        document.getElementById('online-status').innerText = 'Answer готов';
+                        updateOnlineModal();
+                    });
+                } else if (kind === 'answer') {
+                    peerConnection.setRemoteDescription(desc).then(() => {
+                        document.getElementById('online-status').innerText = 'Подключено';
+                        updateOnlineModal();
+                    });
+                }
+            } catch (err) {
+                console.error('Ошибка SDP', err);
+            }
+        }
+
+        function sendGameStateToPeer() {
+            if (dataChannel && dataChannel.readyState === 'open') {
+                dataChannel.send(JSON.stringify({ type: 'gameState', payload: gameState }));
+            } else {
+                showNotification('No P2P connection open');
+            }
+        }
+
+        function applyRemoteState(state) {
+            if (!state) return;
+            // Simple state merge: переопределяем текущее состояние (можно доработать)
+            gameState = state;
+            renderGame();
+            showNotification('Получено состояние от партнёра');
+        }
+
+        function applyRemoteAction(action) {
+            // Для продвинутого синхрона (в будущем) можно применять одиночные ходы
+            console.log('Remote action', action);
         }
 
         function toggleDevModal() {
