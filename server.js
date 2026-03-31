@@ -1,12 +1,37 @@
 const WebSocket = require('ws');
 const http = require('http');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
 const PORT = process.env.PORT || 3000;
 const SECRET = process.env.SECRET || 'fall-of-flags-secret-key-2024';
 
 // Session store
 const sessions = new Map();
+const dataFile = path.join(__dirname, 'userData.json');
+
+function loadData() {
+    try {
+        if (fs.existsSync(dataFile)) {
+            const data = fs.readFileSync(dataFile, 'utf8');
+            return JSON.parse(data);
+        }
+    } catch (e) {
+        console.error('Error loading data:', e);
+    }
+    return {};
+}
+
+function saveData(data) {
+    try {
+        fs.writeFileSync(dataFile, JSON.stringify(data, null, 2));
+    } catch (e) {
+        console.error('Error saving data:', e);
+    }
+}
+
+let userData = loadData();
 
 function generateSessionCode() {
     const code = Math.floor(1000000000 + Math.random() * 8999999999).toString();
@@ -37,8 +62,25 @@ function generatePIN() {
 }
 
 const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Fall of Flags WebRTC Signaling Server\nEndpoint: ws://localhost:3000\n');
+    if (req.method === 'POST' && req.url === '/saveData') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            try {
+                const { userId, data } = JSON.parse(body);
+                userData[userId] = data;
+                saveData(userData);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+            } catch (e) {
+                res.writeHead(400);
+                res.end('Error');
+            }
+        });
+    } else {
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('Fall of Flags WebRTC Signaling Server\nEndpoint: ws://localhost:3000\n');
+    }
 });
 
 const wss = new WebSocket.Server({ server });
