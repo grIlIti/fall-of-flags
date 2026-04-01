@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^cd \"c:\\\\Users\\\\chiry\\\\OneDrive\\\\Рабочий стол\\\\vibecodinng\\\\fall of flags\" ; node server\\.js$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}
