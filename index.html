@@ -590,7 +590,7 @@
     </div>
 
     <!-- Auth Modal -->
-    <div id="auth-modal" class="fixed inset-0 bg-black/90 flex items-center justify-center hidden z-[110] backdrop-blur-sm">
+    <div id="auth-modal" class="fixed inset-0 bg-black/90 flex items-center justify-center hidden z-[80] backdrop-blur-sm">
         <div class="bg-gray-800 p-6 rounded-lg max-w-sm w-full m-4">
             <h2 class="text-xl font-bold text-cyan-300 mb-4 text-center">🔐 Вход / Регистрация</h2>
             <div id="auth-login" class="space-y-4">
@@ -1548,7 +1548,7 @@
 
 /**
  * Switches the game region and updates the available countries accordingly.
- * If the new region requires more wins than the current player has, an alert is shown and the function returns without changing the region.
+ * If the new region requires more wins than the current player has, an showNotification is shown and the function returns without changing the region.
  * @param {string} regionKey - The key of the new region (global, east, nato, eu).
  */
         function setRegion(regionKey) {
@@ -2592,7 +2592,8 @@
 
         function initFirebase() {
             if (!window.firebase) {
-                console.error('Firebase SDK not loaded');
+                console.warn('Firebase SDK not loaded, running in offline mode.');
+                firebaseDb = null;
                 return;
             }
             try {
@@ -2604,6 +2605,7 @@
                 console.log('Firebase initialized');
             } catch (err) {
                 console.error('Firebase init error:', err);
+                firebaseDb = null;
                 document.getElementById('mp-status-text').innerText = 'Firebase ошибка';
             }
         }
@@ -2677,11 +2679,6 @@
                 document.getElementById('btn-host-create').disabled = false;
                 document.getElementById('btn-guest-join').disabled = false;
             }
-        }
-            }).catch(err => {
-                console.error('Session creation failed:', err);
-                document.getElementById('mp-status-text').innerText = `❌ Ошибка создания сессии: ${err.message}`;
-            });
         }
 
         function prepareGuestJoin() {
@@ -2919,7 +2916,7 @@
 
             if (!firebaseDb) initFirebase();
             if (!firebaseDb) {
-                alert('Firebase не доступен');
+                showNotification('Firebase не доступен');
                 return;
             }
 
@@ -2950,55 +2947,51 @@
         function registerUser() {
             const username = document.getElementById('auth-username').value.trim();
             const password = document.getElementById('auth-password').value.trim();
-            if (!username || !password) return alert('Введите имя и пароль');
+            if (!username || !password) return showNotification('Введите имя и пароль');
 
             // Check if user exists
             const users = JSON.parse(localStorage.getItem('users') || '{}');
-            if (users[username]) return alert('Пользователь уже существует');
+            if (users[username]) return showNotification('Пользователь уже существует');
 
-            const newUserId = Date.now().toString(); // Simple ID
-            const user = { username, password, id: newUserId };
+            const userId = Date.now().toString(); // Simple ID
+            const user = { username, password, id: userId };
             users[username] = user;
             localStorage.setItem('users', JSON.stringify(users));
             localStorage.setItem('currentUser', JSON.stringify(user));
             currentUser = user;
-            userId = newUserId;
+            this.userId = userId;
 
             document.getElementById('auth-login').classList.add('hidden');
             document.getElementById('auth-success').classList.remove('hidden');
-            loadUserData();
-            saveUserData();
+            saveUserDataToServer(user);
         }
 
         function loginUser() {
             const username = document.getElementById('auth-username').value.trim();
             const password = document.getElementById('auth-password').value.trim();
-            if (!username || !password) return alert('Введите имя и пароль');
+            if (!username || !password) return showNotification('Введите имя и пароль');
 
             const users = JSON.parse(localStorage.getItem('users') || '{}');
             const user = users[username];
-            if (!user || user.password !== password) return alert('Неверное имя или пароль');
+            if (!user || user.password !== password) return showNotification('Неверное имя или пароль');
 
             localStorage.setItem('currentUser', JSON.stringify(user));
             currentUser = user;
-            userId = user.id;
+            this.userId = user.id;
 
             document.getElementById('auth-login').classList.add('hidden');
             document.getElementById('auth-success').classList.remove('hidden');
-            loadUserData();
-            saveUserData();
         }
 
         function guestLogin() {
-            let guestCounter = parseInt(localStorage.getItem('guestCounter') || '0', 10) + 1;
+            let guestCounter = parseInt(localStorage.getItem('guestCounter') || '0') + 1;
             localStorage.setItem('guestCounter', guestCounter.toString());
             const guestId = '# ' + guestCounter;
+            localStorage.setItem('guestId', guestId);
             currentUser = { displayName: 'Anonymous', id: guestId };
             userId = guestId;
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
             document.getElementById('auth-modal').classList.add('hidden');
-            updateAccountDisplay();
-            // не сохраняем статистику (для гостя)
+            loadUserData();
         }
 
         function closeAuthModal() {
@@ -3350,7 +3343,6 @@
             updateToggleButtons(); // Initialize season button
             loadPlayerStats(); // Load statistics on page load
             loadStatsFromCloud(); // Try to sync from cloud
-            checkAuth();
 
             const savedLang = localStorage.getItem('fallofflags_language');
             if (savedLang && TRANSLATIONS[savedLang]) {
@@ -3389,6 +3381,7 @@
         window.addEventListener('load', () => {
             setTimeout(() => {
                 initFirebase();
+                checkAuth();
             }, 500);
         });
     </script>
